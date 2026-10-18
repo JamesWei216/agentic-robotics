@@ -6,8 +6,6 @@ logs/
 reports/*.pdf
 reports/videos/*.mp4
 
-# 确认队列（运行时临时文件）
-runtime/confirm/
 
 # Python
 __pycache__/
@@ -19,3 +17,6 @@ env/
 .vscode/
 .idea/
 *.swp
+
+# 运行时审计日志（不入库，样本见 docs/audit_sample.jsonl）
+runtime/
