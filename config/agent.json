@@ -1,0 +1,29 @@
+{
+  "llm": {
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-flash",
+    "model_strong": "deepseek-v4-pro",
+    "temperature": 0.2,
+    "timeout_s": 180,
+    "max_retries": 3
+  },
+  "runtime": {
+    "python": "/home/wei/work/g05/GalaxeaVLA-main/.venv/bin/python",
+    "libero_root": "/home/wei/work/g05/LIBERO-master",
+    "suite": "libero_bolt",
+    "n_seeds": 10,
+    "max_repairs": 3,
+    "task_timeout_s": 1200,
+    "parallel_workers": 4
+  },
+  "safety": {
+    "mode": "auto",
+    "confirm_actions": ["first_motion", "grasp_close", "release", "long_travel", "out_of_workspace"],
+    "workspace": {"x": [-0.40, 0.40], "y": [-0.40, 0.40], "z": [0.86, 1.30]},
+    "max_travel_m": 0.45,
+    "max_speed_m_per_s": 0.30,
+    "max_step_m": 0.015,
+    "estop_file": "runtime/ESTOP",
+    "audit_log": "runtime/audit.jsonl"
+  }
+}

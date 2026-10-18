@@ -1,0 +1,21 @@
+# 运行产物（每次评测生成，可由 ./run.sh 复现）
+runs/
+logs/
+
+# 报告与视频是生成物（scripts/make_report_pdf.py / make_videos.py）
+reports/*.pdf
+reports/videos/*.mp4
+
+# 确认队列（运行时临时文件）
+runtime/confirm/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp

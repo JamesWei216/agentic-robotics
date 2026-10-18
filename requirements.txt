@@ -1,0 +1,17 @@
+# agentic-robotics runtime (pure simulation, no hardware)
+# Python 3.10 — developed against the venv at /home/wei/work/g05/GalaxeaVLA-main/.venv
+#
+# LIBERO is NOT a wheel dependency: it must be installed editable from
+# /home/wei/work/g05/LIBERO-master (with the bolt suites installed into it by
+# bolt-sorting/install.py):
+#   pip install -e /home/wei/work/g05/LIBERO-master --no-deps
+#
+mujoco==3.3.2
+robosuite==1.4.0
+numpy==1.26.4
+scipy==1.15.3
+torch==2.7.1
+opencv-python==4.10.0.84
+pillow==10.2.0
+requests==2.32.5
+openai==2.15.0          # used only for the planner/codegen/diagnose LLM calls
