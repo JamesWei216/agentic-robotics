@@ -15,7 +15,7 @@
 | 同任务开启自动修复（A/B） | 子集 97%→100% 采纳，**全量 98%**（未泛化；当时未修复版是 99%） | `runs/20261018-104215_v2_final2/` |
 | **变体套件** `libero_bolt_multi`（11 任务 × 10 seed = 110 episodes） | **71.8%（79/110）**，平均 1517 步（大螺栓类 40/40，短板在小螺栓→蓝盒） | `20261018-134855_multi_carry/` |
 | **视觉闭环**（加分 b，`AGENT_PERCEPTION=vision`，5 任务 × 4 seed） | **90.0%（18/20）**，平均 697 步 | `20261018-135739_vision_regionfix/` |
-| 人确认（manual + 网页面板） | 3 次门控全部经面板批准，审计留痕 | `runs/confirm_demo_panel/` |
+| 人确认（manual + 网页面板） | 面板批准 12 次、episode 通过；**4 张实测截图**（待确认/空闲/急停/夹爪闭合） | `reports/screenshots/` + `runs/confirm_demo_panel/` |
 
 Agent 全链路 = 任务书 → LLM 计划（步骤/约束/风险/确认点）→ LLM 生成代码（AST 白名单）→ 仿真执行 → 固定 seed 评测 → 失败诊断 → 自动修复（配对复测，采纳/回退）→ 报告。
 
@@ -49,7 +49,8 @@ Agent 全链路 = 任务书 → LLM 计划（步骤/约束/风险/确认点）�
 2. **视觉模式收口**（18/20 → 目标 20/20）：
    - 蓝盒内腔底面被近侧盒壁遮挡，估计偏高 12 mm → 用"盒口高度 − 已知盒高"替代内腔底面 5 分位；
    - 小螺栓柄夹持偶滑脱 → 抓六角头 + 高度闭环（需更稳的 z：现在 OSC 偏差 3–8 mm）。
-3. **报告补图**：成功/失败视频（`AGENT_RENDER=1` 出 mp4）+ 人确认面板截图（现在是 HTML 快照）。
+3. ✅ **面板截图（2026-10-18 完成）**：`reports/screenshots/` 四张 PNG（待确认 / 空闲 / 急停 / 夹爪闭合），
+   由 `scripts/capture_confirm_panel.py` 从 live 面板渲染；已嵌进报告 PDF 第六节。
 4. ✅ **打包自检（2026-10-18 完成）**：新建 conda 环境按 `requirements.txt` 从零装好 → preflight 7/7 → t6 2/2 通过；
    过程中补出 6 个隐式依赖（pyyaml / termcolor / bddl / easydict / matplotlib / gym==0.22），已写进 `requirements.txt` 与 `docs/setup.md`。
 

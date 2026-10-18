@@ -191,14 +191,26 @@ HTML = f"""<!DOCTYPE html>
     <td class="left"><code>place()</code> 增加"重抓 + 再搬运"，并用<b>剩余步数 ≥750</b> 守门，避免挤掉多件任务的后半段</td></tr>
 </table>
 
-<h2>六、演示视频（reports/videos/）</h2>
+<h2>六、人机确认面板（manual 模式实测截图）</h2>
+<table style="border:0"><tr>
+<td style="border:0;width:50%;padding:0 6px 0 0"><img src="reports/screenshots/confirm_panel_1_pending.png" style="width:100%"></td>
+<td style="border:0;width:50%;padding:0 0 0 6px"><img src="reports/screenshots/confirm_panel_3_estop_engaged.png" style="width:100%"></td>
+</tr><tr>
+<td class="left" style="border:0;font-size:8.2pt;color:#555">左：待确认（first_motion）——门控动作、details、批准/拒绝按钮、请求号与等待时长。</td>
+<td class="left" style="border:0;font-size:8.2pt;color:#555">右：急停按下——徽标变为急停态；runtime/ESTOP 一旦存在，所有原语每步检查并中止。</td>
+</tr></table>
+<p class="note">面板是纯 stdlib HTTP 服务（无守护进程）：请求/决定走 <code>runtime/confirm/*.json</code>，
+决定落 <code>runtime/audit.jsonl</code>。一次 manual 运行实测：面板批准 12 次，episode 通过；四张截图
+（待确认 / 空闲 / 急停 / 夹爪闭合）见 <code>reports/screenshots/</code>。</p>
+
+<h2>七、演示视频（reports/videos/）</h2>
 <p>每条 episode 独立子进程 + 逐原语 trace，视频为 agentview 俯视（20 Hz，每 2 控制步取一帧）：</p>
 <ul>
 <li><b>成功</b>：v2 t0 / t1 / t5 / t6（含曾经的唯一失败 seed s1006）/ t9 / t10 双件、multi t3 三件、以及 <b>视觉闭环</b>一条（<code>t2_s1000_vision_ok.mp4</code>）。</li>
 <li><b>失败（如实保留）</b>：<code>libero_bolt_multi_t10_s1000_fail.mp4</code> —— 长程 4 件，3600 步预算耗尽。</li>
 </ul>
 
-<h2>七、诚实边界（必须与数字一起看）</h2>
+<h2>八、诚实边界（必须与数字一起看）</h2>
 <ul>
 <li>主口径 <b>感知是特权位姿</b>；视觉闭环单独一条（{VISION['overall']}），差距 9 个百分点主要来自 xy 偏 5–7 mm 把"可达域边缘"的 seed 变不可达。</li>
 <li><b>成功判定由环境目标谓词给出</b>（这是评测口径），不是感知输出。</li>
@@ -209,7 +221,7 @@ HTML = f"""<!DOCTYPE html>
 <li>全部数字与 <code>runs/*/metrics.json</code> 一一对应，评测协议写死在 <code>docs/protocol.md</code>。</li>
 </ul>
 
-<h2>八、复现方式</h2>
+<h2>九、复现方式</h2>
 <table>
 <tr><th style="width:26%">目的</th><th class="left">命令（在项目根目录）</th></tr>
 <tr><td class="left">依赖</td><td class="left"><code>cat requirements.txt</code>；LIBERO 需 <code>pip install -e /home/wei/work/g05/LIBERO-master --no-deps</code></td></tr>
@@ -227,5 +239,5 @@ HTML = f"""<!DOCTYPE html>
 
 if __name__ == "__main__":
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    weasyprint.HTML(string=HTML).write_pdf(str(OUT))
+    weasyprint.HTML(string=HTML, base_url=str(ROOT)).write_pdf(str(OUT))
     print(f"wrote {OUT} ({OUT.stat().st_size / 1024:.0f} KB)")

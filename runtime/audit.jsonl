@@ -22874,3 +22874,13 @@
 {"ts": 1792308321.7215207, "iso": "2026-10-18T15:25:21", "event": "confirm", "decision": "auto_approved", "action": "grasp_close", "details": {"object": "bolt_large_1"}, "request": "89476b474e06"}
 {"ts": 1792308322.7125757, "iso": "2026-10-18T15:25:22", "event": "confirm", "decision": "auto_approved", "action": "release", "details": {"object": "bolt_large_1", "target": "parts_bin_red_1"}, "request": "5d7d0eec2f4a"}
 {"ts": 1792308325.4486609, "iso": "2026-10-18T15:25:25", "event": "confirm", "decision": "auto_approved", "action": "release", "details": {"object": "bolt_large_1", "target": "parts_bin_red_1"}, "request": "091ea07ceb73"}
+{"ts": 1792310062.2451587, "iso": "2026-10-18T15:54:22", "event": "confirm", "decision": "approved", "action": "first_motion", "details": {"gated": "解除使能 / 首次运动"}, "request": "d5155cc6f3a6"}
+{"ts": 1792310087.27809, "iso": "2026-10-18T15:54:47", "event": "confirm", "decision": "approved", "action": "first_motion", "details": {"mode": "manual"}, "request": "c6590a804b2d"}
+{"ts": 1792310087.2781816, "iso": "2026-10-18T15:54:47", "event": "armed", "mode": "manual"}
+{"ts": 1792310090.2823575, "iso": "2026-10-18T15:54:50", "event": "confirm", "decision": "approved", "action": "grasp_close", "details": {"object": "bolt_small_1"}, "request": "85261459497e"}
+{"ts": 1792310193.3573298, "iso": "2026-10-18T15:56:33", "event": "confirm", "decision": "approved", "action": "release", "details": {"object": "bolt_small_1", "target": "parts_bin_blue_1"}, "request": "c1f9f576f897"}
+{"ts": 1792310212.4325867, "iso": "2026-10-18T15:56:52", "event": "confirm", "decision": "approved", "action": "first_motion", "details": {"gated": "解除使能 / 首次运动"}, "request": "52e9619dd3cb"}
+{"ts": 1792310213.4345403, "iso": "2026-10-18T15:56:53", "event": "confirm", "decision": "approved", "action": "first_motion", "details": {"mode": "manual"}, "request": "6eae2afd62f5"}
+{"ts": 1792310213.4346356, "iso": "2026-10-18T15:56:53", "event": "armed", "mode": "manual"}
+{"ts": 1792310213.9360108, "iso": "2026-10-18T15:56:53", "event": "confirm", "decision": "approved", "action": "grasp_close", "details": {"object": "bolt_small_1"}, "request": "9206e2906b39"}
+{"ts": 1792310215.8827555, "iso": "2026-10-18T15:56:55", "event": "confirm", "decision": "approved", "action": "release", "details": {"object": "bolt_small_1", "target": "parts_bin_blue_1"}, "request": "972d1c901764"}
