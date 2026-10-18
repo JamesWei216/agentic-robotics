@@ -1,0 +1,112 @@
+# Agentic Robotics 赛题 · 结果汇总（RESULT_SUMMARY）
+
+**日期**：2026-10-18（收官口径：采样器种子化 + 布局可行 + 全部修复）
+**项目**：`/home/wei/work/g05/agentic-robotics/`
+**平台**：LIBERO / MuJoCo · Franka Panda 单臂 + 平行二指夹爪（纯仿真，无真机依赖）
+
+---
+
+## 1. 三组数字（与 `runs/*/metrics.json` 一一对应）
+
+| 口径 | 命令要点 | 成功 | 平均步数 | 产物 |
+|---|---|---|---|---|
+| **主任务**（10 单件任务 × 10 固定 seed，无自动修复 = 主口径） | `--suite libero_bolt_v2 --seeds 10 --repairs 0` | **100.0%（100/100）** | 587.4（29.4 s/回合 @ 20 Hz） | `runs/20261018-122903_v2_final_seeded/` |
+| **变体任务**（批量分拣，11 任务 × 10 seed） | `--suite libero_bolt_multi --seeds 10` | **63.6 / 64.5 / 66.4%**（三次独立生成脚本，中位 64.5%） | ~1580 | `runs/*_multi_seeded`、`*_multi_final`、`*_multi_v5` |
+| **视觉闭环**（加分 b，5 任务 × 4 seed） | `AGENT_PERCEPTION=vision` | **85.0%（17/20）** | 764 | `runs/20261018-122911_vision_final/` |
+
+主任务**逐任务全清**：t0–t9 各 10/10；0 次超步、0 次 reset 失败、0 次 OOM。
+
+## 2. 一天的收敛过程（同一任务书，逐步修 bug）
+
+| 阶段 | 主任务 | 关键改动 |
+|---|---|---|
+| 10-17 深夜基线 | 98.0%（98/100） | — |
+| + 搬运高弧线 + 失速早退 + 判据分离 | 99.0%（99/100） | A6、A7 |
+| + 采样器种子化（"固定 seed"真的可复现） | 97.0%（97/100） | A11：暴露出 t3 有两个 seed 本来就不可行 |
+| + 螺栓区域 70→55 mm + scene2 微调 | **100.0%（100/100）** | A12，`check_feasibility` 110/110 全通过 |
+
+> 中间那次"下降"不是退步：把随机性关掉之后，原本被运气掩盖的**不可行初始状态**才暴露出来；
+> 修的是套件几何，不是分数。
+
+## 3. 变体任务为什么只有 ~64%
+
+失败分类（110 episodes，按 trace 统计）：**39 例失败中 30 例含"抓取失败"**，其中多数是
+"第 2 件及以后"的抓取（第 1 件成功率 87%，第 2 件起明显下降）。已做的缓解：
+① 释放后先 `home()` 回安全位再接近（t3 单任务 4/10 → 7/10）；
+② 失败后一次"重抓 + 再搬运"（带剩余步数守门）；
+③ 变体套件区域半长 70/25 → 20/8 mm（消除 reset 阶段的布局碰撞）。
+
+仍失败的根因（如实标注）：上一动作残留姿态 + 目标被其他工件/料盒部分遮挡时，预抓取位姿在
+OSC 关节限位处饱和，夹爪在工件上方闭合。下一步：改为**分层子目标编排**（每次只对一件做完整闭环 +
+回安全位），而不是一个脚本顺序跑四件。
+
+## 3b. 改动成本（加分 c 的量化证据，git 可复算）
+
+仓库已初始化并分段提交，三个 tag 对应三个交付状态：
+
+```
+v0.1-main      主任务达标（libero_bolt_v2 100/100）
+v0.2-variant   变体任务接入（批量分拣）
+v1.0-submit    初赛提交版本（含感知闭环 + 交付物）
+```
+
+| 对比 | 命令 | 结果 |
+|---|---|---|
+| 变体任务接入对**控制链路**的改动 | `git diff v0.1-main v0.2-variant --stat -- agent/` | **空（0 行）** |
+| 变体任务接入的**全部**改动 | `git diff v0.1-main v0.2-variant --stat` | 1 file changed, 68 insertions（只有 `taskbooks/sort_variant.md`） |
+
+也就是说：**换任务 = 换一份任务书**；套件由同一 `scripts/gen_suites.py` 生成，`config/missions.json`
+由 bddl 的 goal 自动导出，控制链路与安全层完全复用。
+
+## 4. 视觉闭环（加分项 b）
+
+- `agent/skills/perception.py`：颜色分割 + 深度反投影 + PCA（长轴 / 长度分类 / 盒几何），
+  运行时不读任何仿真真值；`AGENT_PERCEPTION=vision` 切换。
+- 离线核对（真值仅作测试预言机）：24/24 检出，盒中心 0.4–4.2 mm，螺栓横向 2–7 mm / 沿轴 4–8 mm，
+  大小分类 12/12，假目标 0（加尺寸门限前每场景 4 个，来自机械臂本体的大团块）。
+- 在线：**85%（17/20）**；失败集中在"小螺栓→蓝盒"（柄径 13 mm，夹持接触面小）。
+- 三个必须踩的坑：图像缓冲自下而上 vs 内外参自上而下（错配 81 mm → 正确 9 mm）；深度看到的是六角头顶面
+  （比柄高 9–14 mm）；腕部像素数≠在手机检（工件在指下方也算）。
+
+## 5. 自动修复 A/B（诚实结论）
+
+| 轮次 | 配对子集（3 seeds/任务） | 全量 100 episodes | 结论 |
+|---|---|---|---|
+| r1 | 97% → 100% | 98%（比当时未修复版低 1 点） | harness 采纳，但**未泛化** |
+
+根因判断正确（`pick` 吃掉 717/1200 步 → `place` 超步），子集也确实全过 —— 但全量复测没有提升。
+说明"子集提升"不足以证明修复有效，报告里单列为风险；主口径采用未修复版。
+
+## 6. 人机确认（赛题硬性要求）
+
+- 三模式 `auto / manual / deny`；四条门控 `first_motion / grasp_close / release / long_travel`。
+- 网页面板 `python -m agent.confirm_server --port 8077`（带**急停**），决定走 `runtime/confirm/`，审计落 `runtime/audit.jsonl`。
+- 本轮用面板完成 manual 演示：3 次批准，快照见 `runs/confirm_demo_panel/`。
+
+## 7. 交付清单
+
+```
+~/Desktop/Agentic-Robotics-赛题/
+├── Agentic-Robotics-赛题总结报告.pdf   # 3 页 A4（weasyprint）
+├── RESULT_SUMMARY.md                    # 本文件
+├── STATUS.md                            # 交接状态 + 下一步
+├── requirements.txt
+├── README.md PLAN.md
+├── agent/ config/ taskbooks/ scripts/ run.sh
+├── docs/            # workcell / protocol / failures(12 例) / perception
+├── reports/videos/  # 9 条演示视频（含 1 条失败）
+├── runs/            # 主任务 / 变体 / 视觉 / 人确认 的关键运行
+└── confirm_demo_panel/
+```
+
+## 8. 复现与自检
+
+```bash
+PY=/home/wei/work/g05/GalaxeaVLA-main/.venv/bin/python
+export MUJOCO_GL=egl PYOPENGL_PLATFORM=egl
+export PYTHONPATH=/home/wei/work/g05/agentic-robotics:/home/wei/work/g05/LIBERO-master
+
+$PY scripts/preflight.py                    # 环境自检（7 项）
+$PY scripts/check_feasibility.py libero_bolt_v2 10   # 110/110 布局可行
+./run.sh --suite libero_bolt_v2 --taskbook taskbooks/sort_main.md --tasks 0,1,2,3,4,5,6,7,8,9 --seeds 10 --repairs 0
+```
