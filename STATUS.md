@@ -58,6 +58,16 @@ Agent 全链路 = 任务书 → LLM 计划（步骤/约束/风险/确认点）�
 
 ---
 
+## 3b. 提交状态（2026-10-18 17:45）
+
+| 项 | 状态 |
+|---|---|
+| 代码仓库 | ✅ <https://github.com/JamesWei216/agentic-robotics>（public，16 提交 / 8 tag / 79 文件，SSH 推送） |
+| 认证 | ✅ SSH（`~/.ssh/id_ed25519`，无口令，公钥已加到 GitHub）；一次性 token 已删除 |
+| 提交包 | ✅ `~/Desktop/Agentic-Robotics-提交包-20261018/`（11 MB：repo bundle / 两个 zip / 演示片 + 10 片段 / 12 页 PPT / 5 页 PDF） |
+| PR 合入方式 | 后续修改直接 `git push origin master`（SSH 免 token）；大改动建议开分支 + tag |
+| 待办 | ① 官方《任务说明书》/最低指标数值 → 据它校报告措辞 ② 可选：在 GitHub 打 Release 挂 PDF/PPT/演示片 |
+
 ## 4. 关键路径与命令
 
 ```bash
