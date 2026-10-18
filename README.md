@@ -98,7 +98,7 @@ $PY scripts/make_videos.py                    # → reports/videos/*.mp4
 /home/wei/miniconda3/envs/smolvla/bin/python scripts/make_report_pdf.py   # 需 weasyprint
 ```
 
-依赖：见 `requirements.txt`；LIBERO 需 `pip install -e /home/wei/work/g05/LIBERO-master --no-deps`，
+依赖：见 `requirements.txt` 与 **`docs/setup.md`（从零安装的验证记录，含 6 个隐式依赖）**；LIBERO 需 `pip install -e /home/wei/work/g05/LIBERO-master --no-deps`，
 自定义套件用 `scripts/gen_suites.py` 生成并注册。LLM：DeepSeek（key 取 `$DEEPSEEK_API_KEY`，
 否则读 OpenClaw auth store；`--no-llm` 可完全离线）。
 
@@ -167,6 +167,8 @@ agentic-robotics/
 
 **已验证**
 - `scripts/preflight.py` 7 项自检全过；`scripts/check_feasibility.py` 110/110 初始状态可 reset。
+- **干净环境从零安装验证通过**：`conda create -n rb_clean python=3.10` + `pip install -r requirements.txt`
+  + `pip install -e LIBERO --no-deps` → preflight 7/7 → t6 2/2 通过（详见 `docs/setup.md`）。
 - 归档目录内（`~/Desktop/Agentic-Robotics-赛题/`）可直接 `./run.sh --no-llm` 跑通，不依赖开发机的临时文件。
 - 主任务 100 episodes 全部通过，0 次超步、0 次 OOM、0 次 reset 失败。
 
@@ -188,5 +190,6 @@ agentic-robotics/
 | `docs/workcell.md` | 工位几何、物料参数、可达域设计、`contain_region` 约定 |
 | `docs/failures.md` | 12 个真实失败案例：现象 → 根因 → 修复 → 影响（A1–A12、D1–D4） |
 | `docs/perception.md` | RGB-D 感知：运行时不用真值、精度表、三个必须踩的坑 |
+| `docs/setup.md` | 从零安装（干净环境实测）：步骤、6 个隐式依赖、EGL 注意事项 |
 | `RESULT_SUMMARY.md` | 三组数字 + 一天的收敛过程 + 诚实边界 |
 | `STATUS.md` | 交接状态、下一步优先级、结构速查、踩坑速查 |

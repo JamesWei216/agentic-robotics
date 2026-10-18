@@ -50,7 +50,8 @@ Agent 全链路 = 任务书 → LLM 计划（步骤/约束/风险/确认点）�
    - 蓝盒内腔底面被近侧盒壁遮挡，估计偏高 12 mm → 用"盒口高度 − 已知盒高"替代内腔底面 5 分位；
    - 小螺栓柄夹持偶滑脱 → 抓六角头 + 高度闭环（需更稳的 z：现在 OSC 偏差 3–8 mm）。
 3. **报告补图**：成功/失败视频（`AGENT_RENDER=1` 出 mp4）+ 人确认面板截图（现在是 HTML 快照）。
-4. **打包自检**：在干净目录按 `requirements.txt` 重建环境跑一次 `--no-llm --tasks 5 --seeds 3`，确认无隐式依赖。
+4. ✅ **打包自检（2026-10-18 完成）**：新建 conda 环境按 `requirements.txt` 从零装好 → preflight 7/7 → t6 2/2 通过；
+   过程中补出 6 个隐式依赖（pyyaml / termcolor / bddl / easydict / matplotlib / gym==0.22），已写进 `requirements.txt` 与 `docs/setup.md`。
 
 ---
 

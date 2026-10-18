@@ -1,10 +1,14 @@
 # agentic-robotics runtime (pure simulation, no hardware)
-# Python 3.10 — developed against the venv at /home/wei/work/g05/GalaxeaVLA-main/.venv
+# Python 3.10 — verified from scratch in a clean env on 2026-10-18 (see docs/setup.md)
 #
-# LIBERO is NOT a wheel dependency: it must be installed editable from
-# /home/wei/work/g05/LIBERO-master (with the bolt suites installed into it by
-# bolt-sorting/install.py):
-#   pip install -e /home/wei/work/g05/LIBERO-master --no-deps
+#   conda create -n rb_clean python=3.10 -y && conda activate rb_clean
+#   pip install -r requirements.txt
+#   pip install -e /path/to/LIBERO --no-deps      # LIBERO must be editable
+#   python scripts/preflight.py                   # 7 checks must pass
+#
+# On a CPU-only box you can save ~2 GB by installing torch from the CPU index
+# first (it satisfies the pin below):
+#   pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
 #
 mujoco==3.3.2
 robosuite==1.4.0
@@ -14,4 +18,14 @@ torch==2.7.1
 opencv-python==4.10.0.84
 pillow==10.2.0
 requests==2.32.5
-openai==2.15.0          # used only for the planner/codegen/diagnose LLM calls
+openai==2.15.0          # only for the planner/codegen/diagnose LLM calls
+
+# --- transitive deps that the dev venv happened to provide, found by rebuilding
+# from scratch (LIBERO's own setup.py declares no install_requires, so these are
+# on us):
+pyyaml                  # LIBERO benchmark / bddl loading
+termcolor               # robosuite console output
+bddl                    # LIBERO task definitions
+easydict                # LIBERO env config
+matplotlib              # LIBERO utils import chain
+gym==0.22.0             # LIBERO env base class (robosuite 1.4 wants gym, not gymnasium)

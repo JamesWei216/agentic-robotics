@@ -22859,3 +22859,18 @@
 {"ts": 1792303098.480855, "iso": "2026-10-18T13:58:18", "event": "armed", "mode": "auto"}
 {"ts": 1792303098.4895096, "iso": "2026-10-18T13:58:18", "event": "confirm", "decision": "auto_approved", "action": "grasp_close", "details": {"object": "bolt_large_1"}, "request": "a4ca54ac24e5"}
 {"ts": 1792303099.422564, "iso": "2026-10-18T13:58:19", "event": "confirm", "decision": "auto_approved", "action": "release", "details": {"object": "bolt_large_1", "target": "parts_bin_red_1"}, "request": "3c763b05adcb"}
+{"ts": 1792308313.0488288, "iso": "2026-10-18T15:25:13", "event": "confirm", "decision": "auto_approved", "action": "first_motion", "details": {"gated": "解除使能 / 首次运动"}, "request": "526396eba2a0"}
+{"ts": 1792308313.0489361, "iso": "2026-10-18T15:25:13", "event": "confirm", "decision": "auto_approved", "action": "first_motion", "details": {"mode": "auto"}, "request": "caa591c581ff"}
+{"ts": 1792308313.048967, "iso": "2026-10-18T15:25:13", "event": "armed", "mode": "auto"}
+{"ts": 1792308313.0490835, "iso": "2026-10-18T15:25:13", "event": "confirm", "decision": "auto_approved", "action": "grasp_close", "details": {"object": "bolt_large_1"}, "request": "1622fce1ccc1"}
+{"ts": 1792308316.716874, "iso": "2026-10-18T15:25:16", "event": "confirm", "decision": "auto_approved", "action": "release", "details": {"object": "bolt_large_1", "target": "parts_bin_red_1"}, "request": "febd9823f84a"}
+{"ts": 1792308321.719119, "iso": "2026-10-18T15:25:21", "event": "confirm", "decision": "auto_approved", "action": "first_motion", "details": {"gated": "解除使能 / 首次运动"}, "request": "913327f50ab4"}
+{"ts": 1792308321.7192113, "iso": "2026-10-18T15:25:21", "event": "confirm", "decision": "auto_approved", "action": "first_motion", "details": {"mode": "auto"}, "request": "82a729a95372"}
+{"ts": 1792308321.7192483, "iso": "2026-10-18T15:25:21", "event": "armed", "mode": "auto"}
+{"ts": 1792308321.7193675, "iso": "2026-10-18T15:25:21", "event": "confirm", "decision": "auto_approved", "action": "grasp_close", "details": {"object": "bolt_large_1"}, "request": "cb275645923c"}
+{"ts": 1792308321.7212977, "iso": "2026-10-18T15:25:21", "event": "confirm", "decision": "auto_approved", "action": "first_motion", "details": {"gated": "解除使能 / 首次运动"}, "request": "678176e6eca8"}
+{"ts": 1792308321.7213807, "iso": "2026-10-18T15:25:21", "event": "confirm", "decision": "auto_approved", "action": "first_motion", "details": {"mode": "auto"}, "request": "ff58d3ec9d06"}
+{"ts": 1792308321.7214067, "iso": "2026-10-18T15:25:21", "event": "armed", "mode": "auto"}
+{"ts": 1792308321.7215207, "iso": "2026-10-18T15:25:21", "event": "confirm", "decision": "auto_approved", "action": "grasp_close", "details": {"object": "bolt_large_1"}, "request": "89476b474e06"}
+{"ts": 1792308322.7125757, "iso": "2026-10-18T15:25:22", "event": "confirm", "decision": "auto_approved", "action": "release", "details": {"object": "bolt_large_1", "target": "parts_bin_red_1"}, "request": "5d7d0eec2f4a"}
+{"ts": 1792308325.4486609, "iso": "2026-10-18T15:25:25", "event": "confirm", "decision": "auto_approved", "action": "release", "details": {"object": "bolt_large_1", "target": "parts_bin_red_1"}, "request": "091ea07ceb73"}
