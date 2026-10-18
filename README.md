@@ -17,7 +17,7 @@
 | **人机确认**（manual + 网页面板，含急停） | `--confirm-mode manual` | 3 次门控经面板批准，审计留痕 | `runs/confirm_demo_panel/` |
 | 自动修复 A/B | `--repairs 1` | 配对子集 97%→100% 被采纳，**全量复测 98%（未泛化）** | `runs/20261018-104215_v2_final2/` |
 
-> 失败集 12 例、感知精度表、评测协议、工位几何都在 `docs/`；数字出处在 `runs/*/metrics.json`，
+> 失败集 16 例、感知精度表、评测协议、工位几何都在 `docs/`；数字出处在 `runs/*/metrics.json`，
 > 报告 PDF 直接从这些 JSON 读，不会与运行结果脱节。
 
 ---
@@ -127,14 +127,14 @@ runs/<run_id>/
 
 | 赛题要求 | 实现位置 | 状态 |
 |---|---|---|
-| a 主任务（分拣）+ 变体任务 | `taskbooks/sort_main.md`（按尺寸）/ `taskbooks/sort_variant.md`（批量，每类 2 件）；套件 `scripts/gen_suites.py` | ✅ 100/100、64.5% |
+| a 主任务（分拣）+ 变体任务 | `taskbooks/sort_main.md`（按尺寸）/ `taskbooks/sort_variant.md`（批量，每类 2 件）；套件 `scripts/gen_suites.py` | ✅ 100/100、71.8% |
 | b Agent 任务理解：NL → 结构化计划 | `agent/planner.py` + `agent/prompts.py` + `agent/schemas.py` | ✅ |
 | c 场景/流程构建（可复现工作单元） | 两个套件 + 550 初始状态；采样器种子化 + `scripts/check_feasibility.py` | ✅ 110/110 可行 |
 | d 代码生成与调试 + 关键动作人确认 | `agent/codegen.py`（LLM + 模板双路 + AST 白名单）、`agent/run.py` 修复循环、`agent/confirm*.py` | ✅ |
 | e 仿真达标 | `agent/verifier.py`（固定 seed 协议）+ `docs/protocol.md` | ✅ 100 episodes |
-| f 工程交付 | `run.sh` / `requirements.txt` / `runs/*/report.md` / `docs/failures.md`（12 例）/ `reports/videos/` | ✅ |
+| f 工程交付 | `run.sh` / `requirements.txt` / `runs/*/report.md` / `docs/failures.md`（16 例）/ `reports/videos/` | ✅ |
 | 加分 a 虚实迁移（真机） | — | ❌ 未做（SO-101 在手，3–5 天，风险最高） |
-| 加分 b 感知闭环 | `agent/skills/perception.py`（RGB-D 分割 + 反投影 + PCA），`AGENT_PERCEPTION=vision` | ✅ 85% |
+| 加分 b 感知闭环 | `agent/skills/perception.py`（RGB-D 分割 + 反投影 + PCA），`AGENT_PERCEPTION=vision` | ✅ 90% |
 | 加分 c 多任务泛化 | 变体任务书 + 同一 Agent 框架；`agent/` 侧零改动（换任务书 + 套件参数） | 🟡 数量/布局维度已验证，跨任务类型（码垛）未做 |
 | 加分 d 安全与协同 | `agent/safety.py`（工作空间 AABB / 位移上限 / e-stop）+ 确认面板 + 审计 | ✅ |
 
@@ -156,7 +156,7 @@ agentic-robotics/
 │                          confirm(+server) / safety / run + skills/{api,expert,perception}
 ├── scripts/               套件生成、可行性检查、感知标定、诊断、视频、报告 PDF
 ├── docs/                  workcell（工位几何）/ protocol（评测协议）/
-│                          failures（12 例失败案例分析）/ perception（视觉闭环）
+│                          failures（16 例失败案例分析）/ perception（视觉闭环）
 ├── reports/               PDF 报告 + videos/
 └── runs/<run_id>/         每次运行的全链路产物
 ```
@@ -175,7 +175,7 @@ agentic-robotics/
 **已知限制**
 - 变体任务 64.5%：失败 39 例中 30 例含"抓取失败"，集中在第 2 件及以后（第 1 件 87%）。根因是
   上一动作残留姿态 + 邻件遮挡下预抓取位姿在关节限位饱和；下一步是分层子目标编排，不是一个脚本顺序跑四件。
-- 视觉闭环 85%：小螺栓柄径仅 13 mm，柄夹持接触面小偶有滑脱；蓝盒内腔底面被近侧盒壁遮挡，估计偏高 12 mm。
+- 视觉闭环 90%：小螺栓柄径仅 13 mm，柄夹持接触面小偶有滑脱；蓝盒内腔底面被近侧盒壁遮挡，估计偏高 12 mm。
 - 主任务的主口径感知是**特权位姿**；视觉闭环单列，不混进主口径。
 - 自动修复（r1）根因判断正确、子集 97%→100%，但全量复测 98%（未泛化）——"子集提升不等于修复有效"已在报告单列。
 - 本管线不做策略学习：控制逻辑是解析式原语组合；VLA 微调结果（14.5% / 10.2%）作为对照基线，不参与达标口径。
@@ -188,7 +188,7 @@ agentic-robotics/
 |---|---|
 | `docs/protocol.md` | 评测协议：任务集 / 初始状态 / 步数预算 / 指标定义（写死，不可事后调整） |
 | `docs/workcell.md` | 工位几何、物料参数、可达域设计、`contain_region` 约定 |
-| `docs/failures.md` | 12 个真实失败案例：现象 → 根因 → 修复 → 影响（A1–A12、D1–D4） |
+| `docs/failures.md` | 16 个真实失败案例：现象 → 根因 → 修复 → 影响（A1–A13、D1–D4） |
 | `docs/perception.md` | RGB-D 感知：运行时不用真值、精度表、三个必须踩的坑 |
 | `docs/setup.md` | 从零安装（干净环境实测）：步骤、6 个隐式依赖、EGL 注意事项 |
 | `reports/screenshots/README.md` | 人机确认面板 4 张实测截图（待确认/空闲/急停/夹爪闭合）的说明与生成方式 |
