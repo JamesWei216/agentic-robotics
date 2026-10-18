@@ -1,5 +1,8 @@
 # 怎么把本项目推成 repo 链接（逐步操作）
 
+> ✅ **已完成（2026-10-18 17:10）**：已推送到 <https://github.com/<你的GitHub用户名>/agentic-robotics>
+> （public，12 个提交 / 8 个 tag / 79 个文件）。下面的步骤保留作为"重新推一遍"的参考。
+
 目标链接：**https://github.com/<你的GitHub用户名>/agentic-robotics**
 （提交表要的是**仓库**链接，不是个人主页 `https://github.com/<你的GitHub用户名>`）
 
@@ -99,7 +102,7 @@ git ls-remote --heads --tags origin | head -12
 cd /tmp && rm -rf check && git clone https://github.com/<你的GitHub用户名>/agentic-robotics.git check
 cd check
 git tag -l                     # 8 个
-git ls-files | wc -l           # 78
+git ls-files | wc -l           # 79
 ls                             # README.md  agent  config  docs  reports  scripts  taskbooks ...
 ```
 
