@@ -94,7 +94,7 @@ HTML = f"""<!DOCTYPE html>
   <div><b>{MAIN['overall']}</b><span>主任务成功率<br>{MAIN['ok']}/{MAIN['n']} episodes</span></div>
   <div><b>{VARIANT['overall']}</b><span>变体任务成功率<br>{VARIANT['ok']}/{VARIANT['n']} episodes</span></div>
   <div><b>{VISION['overall']}</b><span>视觉闭环（RGB-D）<br>{VISION['ok']}/{VISION['n']} episodes</span></div>
-  <div><b>{MAIN['steps']:.0f}</b><span>主任务平均步数<br>（29.4 s/回合 @ 20 Hz）</span></div>
+  <div><b>{MAIN['steps']:.0f}</b><span>主任务平均步数<br>（34.3 s/回合 @ 20 Hz）</span></div>
 </div>
 
 <h2>一、流水线做了什么</h2>
@@ -138,9 +138,10 @@ HTML = f"""<!DOCTYPE html>
 </ul>
 
 <h2>三、变体任务（libero_bolt_multi）</h2>
-<p>同一任务书、同一套流水线。变体套件每类 2 件（t0–t9）+ 一件 4 件全分拣（t10），共 11 任务 × 10 seed。
-<b>种子化口径下两次独立生成脚本：63.6% / 64.5%</b>；更早（未种子化、每次布局随机）三次是 66.4–75.4% ——
-差异既来自"Agent 写的代码不同"，也来自旧口径每次布局不同，两个来源都如实列出。</p>
+<p>同一任务书、同一套流水线。变体套件每类 2 件（t0–t9）+ 一件 4 件全分拣（t10），共 11 任务 × 10 seed：
+<b>{VARIANT['overall']}（{VARIANT['ok']}/{VARIANT['n']}）</b>。今天在这一项上做了三轮，数字是 64.5% → 70.0% → {VARIANT['overall']}，
+根因见 A13（区域半长小于物体半径 → 料盒被散布到可达域外）与小螺栓搬运滑脱。
+大螺栓类任务（t0/t2/t4/t6）已 **40/40 全清**，短板集中在"小螺栓→蓝盒"与 4 件任务。</p>
 <p>同一工位、同一分类规则，但每类 2 件、任务书换成批量分拣：<b>Agent 侧代码改动 0 行</b>（全部由 <code>R.todo()</code> 驱动），只换任务书与套件。</p>
 <table>
 <tr><th>任务</th>{"".join(f"<th>{t}</th>" for t, _o, _n, _s in VARIANT['per_task'])}</tr>
@@ -183,6 +184,9 @@ HTML = f"""<!DOCTYPE html>
     <td class="left"><code>transfer()</code> 返回的是<b>全局</b>目标谓词 → 新增 <code>_local_placement_ok()</code>，按"本件 vs 本盒"判</td></tr>
 <tr><td>A9</td><td>第二件抓取连续失手（两次 418 步后放弃）</td>
     <td class="left">释放后停在料盒上方（易饱和构型）就接着抓 → <code>pick()</code> 在"上一动作是释放"时先 <code>home()</code>；t3 由 4/10 → 7/10</td></tr>
+<tr><td>A13</td><td>料盒常出现在设计位置外 40–90 mm，搬运"够不着"，随机掉分</td>
+    <td class="left">LIBERO 采样前按物体半径收缩区间，<b>有效抖动 = |区域半长 − 半径|</b>；半长偏小时区间反转、物体在 ±(r−half) 内乱跑。
+    改为 <b>半长 = 半径 + 目标抖动</b>：变体 64.5% → {VARIANT['overall']}，主任务 t6 回到 10/10，视觉 85% → 90%</td></tr>
 <tr><td>A10</td><td>零件滑落即判失败，没有第二次机会</td>
     <td class="left"><code>place()</code> 增加"重抓 + 再搬运"，并用<b>剩余步数 ≥750</b> 守门，避免挤掉多件任务的后半段</td></tr>
 </table>

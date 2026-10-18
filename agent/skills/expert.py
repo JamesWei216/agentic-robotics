@@ -262,6 +262,19 @@ class Expert:
                 return 0.0
         return 0.10
 
+    def _dropped_part(self, bolt, lift_h, tol=0.045) -> bool:
+        """Privileged-mode carry check: is the part still up in the jaws?
+
+        After the first transit leg the part should sit ~lift_h above the table.
+        If it slipped it is back down (or gone), which used to be discovered only
+        at the release, after the whole carry had been paid for.
+        """
+        try:
+            z = float(self.body_pos(bolt)[2])
+        except (KeyError, ValueError):
+            return True
+        return z < self.table_z + tol
+
     def _part_lost(self) -> bool:
         """Wrist-camera check: has the carried part slipped out of the jaws?"""
         if not callable(getattr(self, "last_obs", None)):
@@ -387,13 +400,13 @@ class Expert:
         bolt, head = held["bolt"], held["head"]
         R_grasp, lift_h = held["R_grasp"], held["lift_h"]
         if carry_speed is None:
-            # In *vision* mode the small bolt's 13 mm shank gives the pads very
-            # little to hold on to, so carry it slower (0.015 m/step lost the part
-            # on the first climb in ~1 of 4 vision episodes). The privileged grasp
-            # is stronger, and slowing it down only burned step budget (main
-            # suite mean 631 -> 678 steps), so it stays 0.015 there.
-            slow = self.vision is not None and self.bolt_type(bolt) == "bolt_small"
-            carry_speed = 0.010 if slow else 0.015
+            # The small bolt's 13 mm shank gives the parallel pads very little to
+            # hold on to: at 0.015 m/step the part slipped on the first climb in
+            # ~1 of 4 vision episodes, and the multi-part suite's small-bolt tasks
+            # were the weak spot (t1 3/10, t5 4/10, t9 4/10) while every large-bolt
+            # task was 10/10. Carrying the small part at 0.010 m/step costs budget
+            # but keeps it in the jaws.
+            carry_speed = 0.010 if self.bolt_type(bolt) == "bolt_small" else 0.015
         log = []
 
         box_pos, box_rot, box_size = self.site_state(f"{box}_contain_region")
@@ -474,7 +487,9 @@ class Expert:
         for name, legs in routes.items():
             for target, msteps in legs[:-1]:
                 goto(target, msteps, tol=0.05)
-            if self.vision is not None and self._part_lost():
+            lost = (self._part_lost() if self.vision is not None
+                    else self._dropped_part(bolt, lift_h))
+            if lost:
                 log.append((f"transit:{name}", "PART_LOST"))
                 self._held = None
                 return False, log

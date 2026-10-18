@@ -18,6 +18,9 @@
 - 每个任务 `scripts/gen_init_states.py` 采样 **50** 个物理合法状态（LIBERO 原生 `.pruned_init`）。
 - 评测固定取前 **10** 个：`seed = 1000 + i`，i=0..9。
 - 同一 seed 在不同代码版本下看到的是**完全相同**的初始状态 → 修复前后可配对比较。
+- **区域半长必须 ≥ 物体半径 + 抖动**：`TableRegionSampler` 采样前会按物体包围半径收缩区间，
+  所以有效抖动是 `|半长 − 半径|`；半长偏小会把物体散布到可达域外（详见 `docs/failures.md` A13）。
+  当前规则：工件 `半径 + 30 mm`、料盒 `半径 + 10 mm`（变体套件工件 12 mm、料盒 8 mm）。
 - **采样器也必须种子化**（2026-10-18 修）：LIBERO 的 `env.seed()` 只种仿真器，
   物体布局用的是全局 `np.random`。`Robot.from_env()` 在**构造 env 之前**执行 `np.random.seed(seed)`，
   否则同一 seed 在不同进程里会拿到不同布局（实测 5 个进程里 1 个 `RandomizationError`）。

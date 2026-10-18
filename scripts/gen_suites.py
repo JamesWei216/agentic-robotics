@@ -35,20 +35,39 @@ from libero.libero.utils.task_generation_utils import (  # noqa: E402
 )
 import libero.libero.envs  # noqa: E402,F401  (registers object categories)
 
-BIN_HALF = 0.025     # bin jitter +-~12 mm, keeps every target reachable
-# Was 70 mm until 2026-10-18: with that jitter a bolt region could reach within a
-# few mm of a bin's placement radius, and the sampler then failed on some seeds
-# ("RandomizationError: Cannot place all objects"). Measured with the seeded
-# protocol (see docs/failures.md A11): v2 t3 had 2/10 infeasible seeds. 55 mm
-# keeps every part clearly separated while still moving it around the table.
-BOLT_HALF = 0.055
-# The variant suite keeps four bolts plus two bins on the same table. With the
-# 70 mm jitter used by the single-object suite, neighbouring regions overlap and
-# robosuite's placement sampler gives up ("Cannot place all objects") on ~13% of
-# the seeds -- an infeasible initial state, not a policy failure. Tighter jitter
-# keeps the variant solvable while still moving every object around.
-BOLT_HALF_MULTI = 0.020
-BIN_HALF_MULTI = 0.008
+# ------------------------------------------------------------------ region jitter
+# LIBERO's TableRegionSampler shrinks the region by the object's horizontal
+# radius before sampling (base_region_sampler._sample_x: minimum += r,
+# maximum -= r). The *effective* jitter is therefore |half_len - r|: if the region
+# is narrower than the object, the bounds invert and the object scatters over
+# +-(r - half_len) -- silently, far outside the designed workcell. Measured
+# consequence (2026-10-18): bins with half_len 8 mm and r 65-95 mm scattered
+# +-57-87 mm, landing outside the reachable band and taking whole episodes down.
+# So regions are now built as  half_len = radius + wanted jitter.
+OBJ_RADIUS = {
+    "bolt_small": 0.0310,
+    "bolt_large": 0.0515,
+    "parts_bin_blue": 0.0650,
+    "parts_bin_red": 0.0950,
+}
+JITTER = {                      # v2 (single-object tasks)
+    "bolt_small": 0.030,
+    "bolt_large": 0.030,
+    "parts_bin_blue": 0.010,
+    "parts_bin_red": 0.010,
+}
+JITTER_MULTI = {                # variant suite: 6 objects on one table, tighter
+    "bolt_small": 0.012,
+    "bolt_large": 0.012,
+    "parts_bin_blue": 0.008,
+    "parts_bin_red": 0.008,
+}
+
+
+def region_half(kind: str, multi: bool = False) -> float:
+    jitter = (JITTER_MULTI if multi else JITTER)[kind]
+    return OBJ_RADIUS[kind] + jitter
+
 
 # ---------------------------------------------------------------- reachability
 # Measured on the real controller (see agent/skills/expert.py transfer()):
@@ -93,9 +112,11 @@ MULTI_SCENES = [
     dict(name="bolt_multi_scene5", blue=(-0.14, 0.19), red=(0.14, 0.19),
          bolts={"bolt_small": [(-0.13, -0.05), (0.13, -0.13)],
                 "bolt_large": [(0.13, -0.04), (-0.13, -0.13)]}),
+    # 4-bolt scene (t10): one large bolt moved 0.09,-0.12 -> 0.12,-0.145 so that
+    # seed 1004 stops colliding with the small bolt at -0.07,-0.08 (2026-10-18).
     dict(name="bolt_multi_scene6", blue=(0.15, 0.18), red=(-0.15, 0.18),
          bolts={"bolt_small": [(-0.07, -0.08), (0.09, 0.03)],
-                "bolt_large": [(0.09, -0.12), (-0.10, -0.01)]}),
+                "bolt_large": [(0.12, -0.145), (-0.10, -0.01)]}),
     dict(name="bolt_multi_scene7", blue=(-0.15, 0.19), red=(0.15, 0.19),
          bolts={"bolt_small": [(0.04, -0.12), (-0.10, 0.01)],
                 "bolt_large": [(-0.12, -0.07), (0.12, -0.09)]}),
@@ -119,15 +140,13 @@ def make_scene(spec, scene_type):
 
         def define_regions(self):
             multi = scene_type == "bolt_sorting_multi"
-            bolt_half = BOLT_HALF_MULTI if multi else BOLT_HALF
-            bin_half = BIN_HALF_MULTI if multi else BIN_HALF
             regions = [
-                ("parts_bin_blue", spec["blue"], bin_half),
-                ("parts_bin_red", spec["red"], bin_half),
+                ("parts_bin_blue", spec["blue"], region_half("parts_bin_blue", multi)),
+                ("parts_bin_red", spec["red"], region_half("parts_bin_red", multi)),
             ]
             for cat in ("bolt_small", "bolt_large"):
                 for i, xy in enumerate(spec["bolts"][cat], start=1):
-                    regions.append((f"{cat}_{i}", xy, bolt_half))
+                    regions.append((f"{cat}_{i}", xy, region_half(cat, multi)))
             for tag, xy, half in regions:
                 self.regions.update(self.get_region_dict(
                     region_centroid_xy=list(xy),

@@ -11,9 +11,9 @@
 
 | 口径 | 命令 | 结果 | 产物 |
 |---|---|---|---|
-| **主任务** `libero_bolt_v2`（10 单件任务 × 10 固定初始状态 = 100 episodes） | `--repairs 0` | **100.0%（100/100）**，587 步/回合，29.4 s | `runs/20261018-122903_v2_final_seeded/` |
-| **变体任务** `libero_bolt_multi`（11 任务 × 10 seed = 110 episodes，每类 2 件） | `--suite libero_bolt_multi` | **64.5%（71/110）**（另一次独立生成 63.6%） | `runs/20261018-123707_multi_final/` |
-| **视觉闭环**（加分 b，5 任务 × 4 seed） | `AGENT_PERCEPTION=vision` | **85.0%（17/20）** | `runs/20261018-122911_vision_final/` |
+| **主任务** `libero_bolt_v2`（10 单件任务 × 10 固定初始状态 = 100 episodes） | `--repairs 0` | **100.0%（100/100）**，686 步/回合，34.3 s | `runs/20261018-134900_v2_carry/` |
+| **变体任务** `libero_bolt_multi`（11 任务 × 10 seed = 110 episodes，每类 2 件） | `--suite libero_bolt_multi` | **71.8%（79/110）** | `runs/20261018-134855_multi_carry/` |
+| **视觉闭环**（加分 b，5 任务 × 4 seed） | `AGENT_PERCEPTION=vision` | **90.0%（18/20）** | `runs/20261018-135739_vision_regionfix/` |
 | **人机确认**（manual + 网页面板，含急停） | `--confirm-mode manual` | 3 次门控经面板批准，审计留痕 | `runs/confirm_demo_panel/` |
 | 自动修复 A/B | `--repairs 1` | 配对子集 97%→100% 被采纳，**全量复测 98%（未泛化）** | `runs/20261018-104215_v2_final2/` |
 
