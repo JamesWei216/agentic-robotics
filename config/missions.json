@@ -1,0 +1,266 @@
+{
+  "libero_bolt_v2": {
+    "0": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "1": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "2": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "3": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "4": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "5": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "6": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "7": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "8": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "9": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "10": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ]
+  },
+  "libero_bolt": {
+    "0": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "1": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "2": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "3": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "4": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "5": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "6": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "7": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "8": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "9": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "10": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      }
+    ]
+  },
+  "libero_bolt_multi": {
+    "0": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      },
+      {
+        "object": "bolt_large_2",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "1": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_small_2",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "2": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      },
+      {
+        "object": "bolt_large_2",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "3": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_small_2",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "4": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      },
+      {
+        "object": "bolt_large_2",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "5": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_small_2",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "6": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      },
+      {
+        "object": "bolt_large_2",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "7": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_small_2",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "8": [
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      },
+      {
+        "object": "bolt_large_2",
+        "bin": "parts_bin_red_1"
+      }
+    ],
+    "9": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_small_2",
+        "bin": "parts_bin_blue_1"
+      }
+    ],
+    "10": [
+      {
+        "object": "bolt_small_1",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_small_2",
+        "bin": "parts_bin_blue_1"
+      },
+      {
+        "object": "bolt_large_1",
+        "bin": "parts_bin_red_1"
+      },
+      {
+        "object": "bolt_large_2",
+        "bin": "parts_bin_red_1"
+      }
+    ]
+  }
+}
