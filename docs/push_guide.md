@@ -1,7 +1,10 @@
 # 怎么把本项目推成 repo 链接（逐步操作）
 
-> ✅ **已完成（2026-10-18 17:10）**：已推送到 <https://github.com/JamesWei216/agentic-robotics>
-> （public，12 个提交 / 8 个 tag / 79 个文件）。下面的步骤保留作为"重新推一遍"的参考。
+> ✅ **已完成（2026-10-18 17:10 推送 / 17:37 切 SSH）**：<https://github.com/JamesWei216/agentic-robotics>
+> （public，15 个提交 / 8 个 tag / 79 个文件）。
+> **认证方式已改为 SSH**：`origin = git@github.com:JamesWei216/agentic-robotics.git`，
+> 一次性 fine-grained token 已删除；本机 `~/.ssh/id_ed25519`（ed25519，无口令）已加入 GitHub 账号。
+> 下面的 token 步骤仅保留为"换机器/换账号"时的参考。
 
 目标链接：**https://github.com/JamesWei216/agentic-robotics**
 （提交表要的是**仓库**链接，不是个人主页 `https://github.com/JamesWei216`）
