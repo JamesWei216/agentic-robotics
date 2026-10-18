@@ -192,5 +192,6 @@ agentic-robotics/
 | `docs/perception.md` | RGB-D 感知：运行时不用真值、精度表、三个必须踩的坑 |
 | `docs/setup.md` | 从零安装（干净环境实测）：步骤、6 个隐式依赖、EGL 注意事项 |
 | `reports/screenshots/README.md` | 人机确认面板 4 张实测截图（待确认/空闲/急停/夹爪闭合）的说明与生成方式 |
+| `reports/figures/` | 报告配图：流水线架构 / 一天收敛曲线 / 失败分类（`scripts/make_figures.py` 生成） |
 | `RESULT_SUMMARY.md` | 三组数字 + 一天的收敛过程 + 诚实边界 |
 | `STATUS.md` | 交接状态、下一步优先级、结构速查、踩坑速查 |

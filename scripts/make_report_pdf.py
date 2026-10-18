@@ -98,6 +98,7 @@ HTML = f"""<!DOCTYPE html>
 </div>
 
 <h2>一、流水线做了什么</h2>
+<img src="reports/figures/pipeline_architecture.png" style="width:100%;margin:2px 0 8px">
 <p>自然语言任务书进去，<b>可执行代码 + 仿真评测数字 + 失败诊断 + 报告</b>出来，每一步都有可复现产物：</p>
 <table>
 <tr><th style="width:16%">阶段</th><th style="width:20%">模块</th><th class="left">产物 / 机制</th></tr>
@@ -121,6 +122,7 @@ HTML = f"""<!DOCTYPE html>
 </table>
 <p>唯一失败是 t6 的一个 seed（大螺栓→红盒，红盒落点靠近可达域边缘，搬运阶段超步）。</p>
 
+<img src="reports/figures/convergence.png" style="width:100%;margin:4px 0 6px">
 <h3>本轮（10-18）的关键工程修复 · 一天从 98% 到 100%</h3>
 <table>
 <tr><th style="width:26%">阶段</th><th style="width:14%">主任务</th><th class="left">改动</th></tr>
@@ -155,6 +157,7 @@ HTML = f"""<!DOCTYPE html>
 <tr><td class="left">本次（三次独立生成脚本）</td><td class="good">{VAR3}<br><small>中位 {VAR_MED}</small></td>
     <td class="left">根因是"第 2 件及以后"的抓取：39 例失败中 30 例含抓取失败。已做 ① 释放后先 home 再接近 ② 失败后重抓一次（带预算守门） ③ 区域半长 70/25→20/8 mm</td></tr>
 </table>
+<img src="reports/figures/failure_taxonomy.png" style="width:76%;display:block;margin:6px auto 8px">
 <p class="note"><b>改动成本</b>：主任务 → 变体任务，<code>agent/</code> 目录 diff 为 0 行；变化只在
 <code>taskbooks/sort_variant.md</code>（任务书）与 <code>utils/gen_suites.py</code>（套件定义，属于"环境生成"而非"策略代码"）。</p>
 
@@ -173,7 +176,7 @@ HTML = f"""<!DOCTYPE html>
 ② 深度最先返回的是**六角头顶面**（比柄高 9–14 mm），抓取高度必须用"台面标定 + 工件几何"，否则夹爪在柄上方空夹；
 ③ 腕部相机像素数≠在手机检（工件在指下方时也在视野里），抓取判定改用"撤臂后看原位是否已空"。</p>
 
-<h2>五、本轮修的五个真 bug（详见 docs/failures.md A6–A10）</h2>
+<h2>五、本轮修的真 bug（A6–A13 摘要，完整 16 例见 docs/failures.md）</h2>
 <table>
 <tr><th style="width:8%">编号</th><th style="width:34%">现象</th><th class="left">根因 → 修法</th></tr>
 <tr><td>A6</td><td>搬运中途停住，误差恒定 0.26 m 直到超步</td>
@@ -187,6 +190,10 @@ HTML = f"""<!DOCTYPE html>
 <tr><td>A13</td><td>料盒常出现在设计位置外 40–90 mm，搬运"够不着"，随机掉分</td>
     <td class="left">LIBERO 采样前按物体半径收缩区间，<b>有效抖动 = |区域半长 − 半径|</b>；半长偏小时区间反转、物体在 ±(r−half) 内乱跑。
     改为 <b>半长 = 半径 + 目标抖动</b>：变体 64.5% → {VARIANT['overall']}，主任务 t6 回到 10/10，视觉 85% → 90%</td></tr>
+<tr><td>A11</td><td>"固定 seed"其实不可复现：同一 seed 在不同进程给出不同布局</td>
+    <td class="left">LIBERO 的 <code>env.seed()</code> 只种仿真器，布局用全局 <code>np.random</code> → 在<b>构造 env 之前</b> <code>np.random.seed(seed)</code>（A11）</td></tr>
+<tr><td>A12</td><td>种子化后暴露 t3 两个 seed"本来就无解"</td>
+    <td class="left">螺栓区域 70→55 mm + scene2 微调，`check_feasibility` 110/110 全通过（A12）</td></tr>
 <tr><td>A10</td><td>零件滑落即判失败，没有第二次机会</td>
     <td class="left"><code>place()</code> 增加"重抓 + 再搬运"，并用<b>剩余步数 ≥750</b> 守门，避免挤掉多件任务的后半段</td></tr>
 </table>
