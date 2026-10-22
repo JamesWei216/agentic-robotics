@@ -118,3 +118,31 @@ agentic-robotics/
 5. **深度看到的是最高面**（六角头），不是要夹的柄 → 抓取高度用"台面标定 + 工件几何"。
 6. **腕部像素数≠在手机检**（工件在指下方也算），抓取判定用"撤臂后原位是否已空"。
 7. `run.sh` 不带 `-u`，后台日志会缓冲；看进度请看 `runs/<id>/verify/` 而不是日志文件。
+
+---
+
+## 7. 2026-10-22 夜 · 官方赛题要求到手后的状态（明天从这里继续）
+
+**官方要求差距清单**：`docs/SPEC_GAP.md`（逐条对齐 + P0/P1/P2 + 排期到 11-03）
+
+### ✅ 已完成：P0-1 可复现打包（commit `9ce9ad5`，本地未 push）
+
+- `vendor/bolt-sorting/` 入仓；`scripts/bootstrap_env.sh`（8 步幂等，LIBERO pin `8f1084e`）
+- `scripts/_paths.py` 路径解析；`run.sh` / `agent/skills/api.py` 同步
+- `scripts/make_submission.sh` 官方命名一键打包（实测 5.3 MB / 3161 文件）
+- `docs/运行方式.md`（提交包内）、`docs/repro_check_20261022.md`（干净环境实测）
+- **实测**：`/tmp` 全新副本 + 新 conda（CPU torch）→ preflight 7/7 → t6 s1000 100%（1079 步 / 8.7 s）
+- 实测抓到并修复 **A14 `LIBERO_CONFIG_PATH` 用户级全局配置串台**、**A15 安装顺序 KeyError**（见 `docs/failures.md`）
+- 开发机 LIBERO 的 bddl/init 已恢复（11+11），preflight 复查 7/7
+
+### ⏭️ 明天待做（按顺序）
+
+1. **P1-1 码垛 suite**（`libero_wood_stack`）+ 改动成本表 → 补官方加分 c「码垛↔分拣切换、改动成本可量化」
+2. **P1-2 变体 71.8% → ≥85%**（分层子目标编排 + 遮挡检查）
+3. **P1-3 报告口径**：人确认按官方口径改（仿真 auto 不阻断 / 真机 manual+急停）、补 Agent 证据链章节、无隐藏测试集声明
+4. **P0-2 打包**：等 James 给 单位简称 / 作品名 / 队长姓名 / 手机号
+5. **P0-3 视频**：≤5 min 成片 + 网盘链接（等网盘选定）
+
+### 需要 James 提供
+- 官方《任务说明包》（**分拣物料是否含螺母**最重要；还有最低指标数值、工位尺寸/垛型）
+- 提交包命名 4 个字段；网盘账号
