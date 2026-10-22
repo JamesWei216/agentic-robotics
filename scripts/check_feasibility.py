@@ -6,12 +6,16 @@
 Uses the same seeding order as the agent (np.random.seed(then env.seed) right
 before reset) so a failure here means the episode would have failed at reset.
 """
+import os
 import pathlib
 import sys
 
 import numpy as np
 
-sys.path.insert(0, "/home/wei/work/g05/LIBERO-master")
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from _paths import libero_root  # noqa: E402
+
+sys.path.insert(0, str(libero_root()))
 from libero.libero import get_libero_path  # noqa: E402
 from libero.libero.benchmark import get_benchmark_dict  # noqa: E402
 from libero.libero.envs import OffScreenRenderEnv  # noqa: E402

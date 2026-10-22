@@ -64,6 +64,22 @@ taskbooks/sort_main.md           ← 自然语言任务书（工位/物料/目�
 
 ## 2. 快速开始
 
+**从零（干净机器）**——一条命令装环境（拉 LIBERO pin 版本 → 依赖 → 资产 → 三个套件 → 初始状态 → 自检）：
+
+```bash
+conda create -n rb python=3.10 -y && conda activate rb
+python -m pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
+cd agentic-robotics
+AGENT_PYTHON=$(which python) bash scripts/bootstrap_env.sh     # 8 步，幂等
+AGENT_PYTHON=$(which python) ./run.sh --suite libero_bolt_v2 \
+    --taskbook taskbooks/sort_main.md --tasks 0,1,2,3,4,5,6,7,8,9 --seeds 10
+```
+
+详见 **`docs/setup.md`**（含 6 个隐式依赖）与提交包内的 **`运行方式.md`**。
+LIBERO 路径解析：`$AGENT_LIBERO_ROOT` → `third_party/LIBERO` → 开发机历史路径（`scripts/_paths.py`）。
+
+**开发机（已装好环境）**：
+
 ```bash
 cd /home/wei/work/g05/agentic-robotics
 PY=/home/wei/work/g05/GalaxeaVLA-main/.venv/bin/python

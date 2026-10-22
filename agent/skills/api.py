@@ -24,9 +24,28 @@ import time
 
 import numpy as np
 
-LIBERO_ROOT = os.environ.get("AGENT_LIBERO_ROOT", "/home/wei/work/g05/LIBERO-master")
+def _resolve_libero() -> str:
+    """AGENT_LIBERO_ROOT → <repo>/third_party/LIBERO → 开发机历史路径。"""
+    env = os.environ.get("AGENT_LIBERO_ROOT")
+    repo = pathlib.Path(__file__).resolve().parents[2]
+    for cand in ([pathlib.Path(env)] if env else []) + [
+        repo / "third_party" / "LIBERO",
+        pathlib.Path("/home/wei/work/g05/LIBERO-master"),
+    ]:
+        if (cand / "libero" / "libero").is_dir():
+            return str(cand)
+    return str(repo / "third_party" / "LIBERO")
+
+
+LIBERO_ROOT = _resolve_libero()
 if LIBERO_ROOT not in sys.path:
     sys.path.insert(0, LIBERO_ROOT)
+
+# LIBERO 的 bddl/init/assets 目录由 $LIBERO_CONFIG_PATH/config.yaml 决定（默认是用户级的 ~/.libero，
+# 一台机器上装过两个 LIBERO 时会静默写到“先装的那个”）。仓库内有 bootstrap 生成的配置就用它。
+_pcfg = pathlib.Path(__file__).resolve().parents[2] / "third_party" / "libero_config"
+if (_pcfg / "config.yaml").is_file():
+    os.environ["LIBERO_CONFIG_PATH"] = str(_pcfg)
 
 from libero.libero import get_libero_path  # noqa: E402
 from libero.libero.benchmark import get_benchmark_dict  # noqa: E402

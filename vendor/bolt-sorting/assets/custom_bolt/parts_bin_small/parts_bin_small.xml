@@ -1,0 +1,22 @@
+<mujoco model="parts_bin_small">
+  <worldbody>
+    <body>
+      <body name="object">
+        <site type="box" pos="0.000000 0.000000 0.026500" quat="0.00000 0.00000 0.00000 1.00000" size="0.057000 0.057000 0.018500" group="0" rgba="1 0 0 0" name="contain_region"/>
+        <geom pos="0.000000 0.000000 0.004000" size="0.065000 0.065000 0.004000" type="box" solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" group="0"/>
+        <geom pos="0.061000 0.000000 0.022500" size="0.004000 0.065000 0.022500" type="box" solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" group="0"/>
+        <geom pos="-0.061000 0.000000 0.022500" size="0.004000 0.065000 0.022500" type="box" solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" group="0"/>
+        <geom pos="0.000000 0.061000 0.022500" size="0.065000 0.004000 0.022500" type="box" solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" group="0"/>
+        <geom pos="0.000000 -0.061000 0.022500" size="0.065000 0.004000 0.022500" type="box" solimp="0.998 0.998 0.001" solref="0.001 1" density="100" friction="0.95 0.3 0.1" group="0"/>
+        <geom pos="0.000000 0.000000 0.004000" size="0.065000 0.065000 0.004000" type="box" contype="0" conaffinity="0" group="1" rgba="0.200000 0.420000 0.880000 1.000000"/>
+        <geom pos="0.061000 0.000000 0.022500" size="0.004000 0.065000 0.022500" type="box" contype="0" conaffinity="0" group="1" rgba="0.200000 0.420000 0.880000 1.000000"/>
+        <geom pos="-0.061000 0.000000 0.022500" size="0.004000 0.065000 0.022500" type="box" contype="0" conaffinity="0" group="1" rgba="0.200000 0.420000 0.880000 1.000000"/>
+        <geom pos="0.000000 0.061000 0.022500" size="0.065000 0.004000 0.022500" type="box" contype="0" conaffinity="0" group="1" rgba="0.200000 0.420000 0.880000 1.000000"/>
+        <geom pos="0.000000 -0.061000 0.022500" size="0.065000 0.004000 0.022500" type="box" contype="0" conaffinity="0" group="1" rgba="0.200000 0.420000 0.880000 1.000000"/>
+      </body>
+      <site rgba="0 0 0 0" size="0.005" pos="0 0 0" name="bottom_site"/>
+      <site rgba="0 0 0 0" size="0.005" pos="0 0 0.045000" name="top_site"/>
+      <site rgba="0 0 0 0" size="0.005" pos="0.065000 0 0" name="horizontal_radius_site"/>
+    </body>
+  </worldbody>
+</mujoco>
