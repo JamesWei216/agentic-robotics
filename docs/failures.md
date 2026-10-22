@@ -180,3 +180,32 @@
   变体套件 64.5% → **71.8%**，主任务 t6 回到 10/10，视觉模式 85% → **90%**。
 - **教训**：**"物体随机摆放"的参数（区域尺寸）必须与物体尺寸一起校验**；这类 bug 不报错、只让成绩随机抖动，
   最容易被误判成"策略不行"。
+
+---
+
+## A14 · `LIBERO_CONFIG_PATH` 是用户级全局配置，会让"复现"写到别的目录（2026-10-22）
+
+**症状**：在 `/tmp` 的全新副本里跑 `gen_suites.py`，日志显示 bddl 写到了
+`/home/wei/work/g05/LIBERO-master/...`（开发机那棵树），新副本里反而没有。
+
+**根因**：LIBERO 的 `get_libero_path()` 不按 `pip install -e` 的路径找文件，而是读
+`$LIBERO_CONFIG_PATH/config.yaml`（默认 `~/.libero/config.yaml`）里的**绝对路径**。
+一台机器上装过多个 LIBERO 时，后装的会继续用先装的那个配置（首次导入时生成，之后不覆盖）。
+后果很隐蔽：`RandomizationError`、任务表串台、"生成了却找不到"。
+
+**修法**：`bootstrap_env.sh` 写 `third_party/libero_config/config.yaml` 并 export
+`LIBERO_CONFIG_PATH`；`run.sh` / `scripts/_paths.py` / `agent/skills/api.py` 统一"项目内配置优先"。
+
+**教训**：凡是"用户级全局配置 + 绝对路径"的框架，打包复现时必须显式隔离，否则本地全绿、换机全红。
+
+## A15 · 安装顺序造成 benchmark 导入 `KeyError: 'libero_bolt'`（2026-10-22）
+
+**症状**：`from libero.libero.benchmark import get_benchmark_dict` →
+`KeyError: 'libero_bolt'`（`benchmark/__init__.py` 里遍历 `libero_suites` 读 task map）。
+
+**根因**：`install.py` 先把 `"libero_bolt"` 加进 `libero_suites`，而 task map 的键要等 bddl
+生成后才由 `install.py` 第 3 步写入 → 中间态下导入即崩（`gen_missions.py` 正好踩在中间态）。
+
+**修法**：`install.py` 新增第 4b 步，缺键时先写 `libero_task_map["libero_bolt"] = []` 占位。
+
+**教训**：注册表类改造要保证"任意中间态都可导入"，否则复现脚本的步骤顺序就变成隐式契约。

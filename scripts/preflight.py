@@ -20,7 +20,10 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-LIBERO = os.environ.get("AGENT_LIBERO_ROOT", "/home/wei/work/g05/LIBERO-master")
+sys.path.insert(0, str(ROOT / "scripts"))
+from _paths import libero_root  # noqa: E402
+
+LIBERO = str(libero_root())
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, LIBERO)
 

@@ -9,13 +9,17 @@ reproducible and identical across code versions.
 """
 import argparse
 import gc
+import os
 import pathlib
 import sys
 
 import numpy as np
 import torch
 
-LIBERO = "/home/wei/work/g05/LIBERO-master"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from _paths import libero_root  # noqa: E402
+
+LIBERO = str(libero_root())
 sys.path.insert(0, LIBERO)
 
 from libero.libero import get_libero_path  # noqa: E402

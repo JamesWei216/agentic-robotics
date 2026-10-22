@@ -1,0 +1,8 @@
+# 提交包内“关键运行”清单（make_submission.sh 读取）
+# 每行一个 runs/<run_id>；# 开头为注释；mp4 不进包（视频单独走网盘）
+20261018-134900_v2_carry
+20261018-134855_multi_carry
+20261018-135739_vision_regionfix
+20261018-104215_v2_final2
+confirm_demo_panel
+20261018-152511_cleanenv_check

@@ -15,6 +15,7 @@ LIBERO's benchmark registry (append-only, marker guarded).
 Run with the GalaxeaVLA venv python, from the project root:
     MUJOCO_GL=egl PYTHONPATH=<proj>:<LIBERO> python scripts/gen_suites.py
 """
+import os
 import pathlib
 import re
 import shutil
@@ -22,7 +23,10 @@ import sys
 
 import numpy as np
 
-LIBERO = "/home/wei/work/g05/LIBERO-master"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from _paths import libero_root  # noqa: E402
+
+LIBERO = str(libero_root())
 sys.path.insert(0, LIBERO)
 
 from libero.libero import get_libero_path  # noqa: E402
