@@ -32,9 +32,16 @@ def _pct(d):
     return f"{100 * d['overall']:.1f}%"
 
 
-MAIN_M = _latest(os.environ.get("MAIN_RUN", "*v2_primary*"))
-VAR_M = _latest(os.environ.get("VAR_RUN", "*multi_v*"))
-VIS_M = _latest(os.environ.get("VIS_RUN", "*vision_eval*"))
+MAIN_M = _latest(os.environ.get("MAIN_RUN", "20261018-134900_v2_carry"))
+VAR_M = _latest(os.environ.get("VAR_RUN", "20261018-134855_multi_carry"))
+VIS_M = _latest(os.environ.get("VIS_RUN", "20261018-135739_vision_regionfix"))
+STACK_M = _latest(os.environ.get("STACK_RUN", "20261023-211446_stack_full"))
+
+# 参赛信息 + 视频链接（提交包构建时由 make_submission.sh 通过环境变量注入）
+ORG = os.environ.get("SUB_ORG", "北京精密机电设备控制研究所")
+WORK = os.environ.get("SUB_WORK", "AG-VLA智能机械臂")
+LEADER = os.environ.get("SUB_LEADER", "魏凤辰")
+VIDEO_URL = os.environ.get("VIDEO_URL", "").strip()
 
 MAIN = dict(overall=_pct(MAIN_M), ok=MAIN_M["ok"], n=MAIN_M["n"],
             steps=MAIN_M.get("mean_steps", 0), run=MAIN_M["_run"],
@@ -47,6 +54,73 @@ VARIANT = dict(overall=_pct(VAR_M), ok=VAR_M["ok"], n=VAR_M["n"],
                          for k, v in sorted(VAR_M["per_task"].items(), key=lambda kv: int(kv[0]))])
 VISION = dict(overall=_pct(VIS_M), ok=VIS_M["ok"], n=VIS_M["n"],
               steps=VIS_M.get("mean_steps", 0), run=VIS_M["_run"])
+STACK = dict(overall=_pct(STACK_M), ok=STACK_M["ok"], n=STACK_M["n"],
+             steps=STACK_M.get("mean_steps", 0), run=STACK_M["_run"],
+             per_task=[(f"t{k}", v["ok"], v["n"], v.get("mean_steps", 0))
+                       for k, v in sorted(STACK_M["per_task"].items(), key=lambda kv: int(kv[0]))])
+STACK_PATTERNS = ["t0–t4 三层直塔（On(b2,b1) ∧ On(b3,b2)）",
+                  "t5–t9 两层塔（On(b2,b1)）",
+                  "t10 双层双列 4 块（On(b2,b1) ∧ On(b4,b3)）"]
+
+
+def _snippet_plan(run: str) -> str:
+    """plan.json -> a few compact lines (steps + one constraint + one risk)."""
+    p = ROOT / "runs" / run / "plan.json"
+    if not p.exists():
+        return "（未找到 plan.json）"
+    plan = json.loads(p.read_text())
+    steps = []
+    for s in plan.get("steps", [])[:4]:
+        args = ", ".join(f"{k}={v}" for k, v in (s.get("args") or {}).items())
+        steps.append(f'  {s["id"]}. {s["op"]}({"args: " + args if args else ""})')
+    cons = (plan.get("constraints") or [{}])[0].get("text", "")
+    risk = (plan.get("risks") or [{}])[0]
+    return ("{\n 7 \"steps\": [\n" + "\n".join(steps) + "\n  ...],\n"
+            f'  "constraints": ["{cons}", ...],\n'
+            f'  "risks": [{{"text": "{risk.get("text","")}", "mitigation": "{risk.get("mitigation","")}"}}, ...]\n}}')
+
+
+def _snippet_code(run: str) -> str:
+    p = ROOT / "runs" / run / "task.py"
+    if not p.exists():
+        return "（未找到 task.py）"
+    lines = p.read_text().splitlines()
+    keep = [l for l in lines if any(k in l for k in
+            ("def run(", "for item in R.todo()", "item.get(\"on\")", "pick_and_stack",
+             "pick_and_place", "R.check()", "R.home()"))]
+    return "\n".join(keep[:7]) or "\n".join(lines[8:14])
+
+
+def _snippet_trace(run: str, ep: str = "t0_s1000") -> str:
+    p = ROOT / "runs" / run / "verify" / ep / "trace.jsonl"
+    if not p.exists():
+        return "（未找到 trace.jsonl）"
+    out = []
+    for line in p.read_text().splitlines():
+        ev = json.loads(line)
+        if ev.get("event") in ("todo", "pick", "stack", "check", "home"):
+            brief = {k: v for k, v in ev.items() if k in
+                     ("event", "items", "object", "on", "success", "steps")}
+            out.append(json.dumps(brief, ensure_ascii=False))
+    return "\n".join(out[:6])
+
+
+def _snippet_ast() -> str:
+    """Run the real validator on a malicious snippet to show the rejection."""
+    sys.path.insert(0, str(ROOT))
+    from agent.codegen import validate_code
+    bad = "import os\nfrom agent.skills.api import Robot\nR = Robot.from_env()\nopen('x','w')\ndef run(): return True\n"
+    try:
+        validate_code(bad)
+        return "（意外通过）"
+    except Exception as e:  # noqa: BLE001
+        return f"输入：import os / open('x','w')\n拒绝：{type(e).__name__}: {e}"
+
+
+PLAN_SNIPPET = _snippet_plan(STACK["run"])
+CODE_SNIPPET = _snippet_code(STACK["run"])
+TRACE_SNIPPET = _snippet_trace(STACK["run"])
+AST_SNIPPET = _snippet_ast()
 
 # every variant-suite run of the day, so the variance is visible in the report
 _multi = []
@@ -87,14 +161,15 @@ HTML = f"""<!DOCTYPE html>
 </style></head><body>
 
 <h1>Agentic Robotics 赛题 · 总结报告</h1>
-<div class="sub">赛题：Agent 驱动的机械臂应用开发与评测流水线（主任务=分拣，变体任务=批量分拣）<br>
-平台：LIBERO / MuJoCo · Franka Panda 单臂 + 平行二指夹爪 · 纯仿真 · 2026-10-18</div>
+<div class="sub">作品：<b>{WORK}</b> · 单位：{ORG} · 队长：{LEADER}<br>
+赛题：Agent 驱动的机械臂应用开发与评测流水线 · 主任务=分拣，变体=批量分拣，加分 c=码垛<br>
+平台：LIBERO / MuJoCo · Franka Panda 单臂 + 平行二指夹爪 · 纯仿真 · 2026-10-23</div>
 
 <div class="kpi">
   <div><b>{MAIN['overall']}</b><span>主任务成功率<br>{MAIN['ok']}/{MAIN['n']} episodes</span></div>
   <div><b>{VARIANT['overall']}</b><span>变体任务成功率<br>{VARIANT['ok']}/{VARIANT['n']} episodes</span></div>
-  <div><b>{VISION['overall']}</b><span>视觉闭环（RGB-D）<br>{VISION['ok']}/{VISION['n']} episodes</span></div>
-  <div><b>{MAIN['steps']:.0f}</b><span>主任务平均步数<br>（34.3 s/回合 @ 20 Hz）</span></div>
+  <div><b>{STACK['overall']}</b><span>码垛（加分 c）<br>{STACK['ok']}/{STACK['n']} episodes</span></div>
+  <div><b>{VISION['overall']}</b><span>视觉闭环（加分 b）<br>{VISION['ok']}/{VISION['n']} episodes</span></div>
 </div>
 
 <h2>一、流水线做了什么</h2>
@@ -103,7 +178,7 @@ HTML = f"""<!DOCTYPE html>
 <table>
 <tr><th style="width:16%">阶段</th><th style="width:20%">模块</th><th class="left">产物 / 机制</th></tr>
 <tr><td>1 任务理解</td><td>agent/planner.py</td><td class="left">LLM → <code>plan.json</code>：步骤 / 约束 / 风险点 / <b>人确认点</b></td></tr>
-<tr><td>2 代码生成</td><td>agent/codegen.py</td><td class="left">LLM → <code>task.py</code>，**AST 白名单**只允许调用原语 API；失败可回退模板路径</td></tr>
+<tr><td>2 代码生成</td><td>agent/codegen.py</td><td class="left">LLM → <code>task.py</code>，<b>AST 白名单</b>只允许调用原语 API；失败可回退模板路径</td></tr>
 <tr><td>3 执行</td><td>agent/executor.py</td><td class="left">每条 episode 独立子进程 + <code>trace.jsonl</code> 逐原语留痕（含 <code>skip_after_termination</code>）</td></tr>
 <tr><td>4 评测</td><td>agent/verifier.py</td><td class="left">固定 seed 协议（seed 1000..1009），成功率 / 节拍 / 确认次数</td></tr>
 <tr><td>5 诊断</td><td>agent/diagnose.py</td><td class="left">规则分类 + LLM 根因（root_cause / evidence / fix_hint）</td></tr>
@@ -112,6 +187,20 @@ HTML = f"""<!DOCTYPE html>
 <p class="note"><b>人机确认</b>：<code>auto</code>（仿真，仍写审计）/ <code>manual</code>（阻塞等人，TTY 或网页面板）/ <code>deny</code>（回归测试用）。
 四条门控：解除使能、夹爪闭合、释放物料、长距离移动；网页面板 <code>localhost:8077</code> 带<b>急停</b>，
 所有决定写入 <code>runtime/audit.jsonl</code>。本次已用网页面板完成 manual 演示（3 次批准，快照见归档 <code>confirm_demo_panel/</code>）。</p>
+
+<h2>一·B、Agent 证据链（可核查）</h2>
+<p class="note">以下三类证据都是仓库里的<b>真实文件片段</b>（每次运行自动生成），与数字一一对应，可用 <code>cat</code> 直接核对。</p>
+<table>
+<tr><th style="width:16%">证据</th><th style="width:26%">文件</th><th class="left">片段</th></tr>
+<tr><td class="left">结构计划<br>（步骤/约束/风险/确认点）</td><td class="left"><code>runs/{STACK['run']}/plan.json</code></td>
+    <td class="left"><code style="white-space:pre-wrap">{PLAN_SNIPPET}</code></td></tr>
+<tr><td class="left">生成的控制逻辑</td><td class="left"><code>runs/{STACK['run']}/task.py</code></td>
+    <td class="left"><code style="white-space:pre-wrap">{CODE_SNIPPET}</code></td></tr>
+<tr><td class="left">逐原语 trace</td><td class="left"><code>runs/{STACK['run']}/verify/t0_s1000/trace.jsonl</code></td>
+    <td class="left"><code style="white-space:pre-wrap">{TRACE_SNIPPET}</code></td></tr>
+<tr><td class="left">AST 安全拦截<br>（实测）</td><td class="left">agent/codegen.validate_code</td>
+    <td class="left"><code style="white-space:pre-wrap">{AST_SNIPPET}</code></td></tr>
+</table>
 
 <h2>二、主任务成绩（libero_bolt_v2）</h2>
 <p>10 个单件分拣任务 × 10 个固定初始状态 = 100 episodes，成功率 {MAIN['overall']}，平均 {MAIN['steps']:.0f} 步/回合。</p>
@@ -160,6 +249,38 @@ HTML = f"""<!DOCTYPE html>
 <img src="reports/figures/failure_taxonomy.png" style="width:76%;display:block;margin:6px auto 8px">
 <p class="note"><b>改动成本</b>：主任务 → 变体任务，<code>agent/</code> 目录 diff 为 0 行；变化只在
 <code>taskbooks/sort_variant.md</code>（任务书）与 <code>utils/gen_suites.py</code>（套件定义，属于"环境生成"而非"策略代码"）。</p>
+
+<h2>三·B、码垛（加分 c）：同一框架的第二类任务</h2>
+<p>加分 c 要求证明<b>同一套 Agent 框架</b>能在码垛与分拣之间切换，并把切换成本量化。新增套件
+<code>libero_wood_stack</code>：40 mm 木块、3 种约定垛型、11 任务 × 10 个固定初始状态。
+成功判定用 LIBERO 原生 <code>On(top, base)</code> 谓词（底块 z ≤ 顶块 z + 几何接触 + 中心 xy < 30 mm），
+<b>没有自写判定脚本</b>。结果：<b>{STACK['overall']}（{STACK['ok']}/{STACK['n']}）</b>，平均 {STACK['steps']:.0f} 步/回合；
+LLM 全链路（模型出计划 + 出代码）抽样 4 任务 × 2 seed = 8/8 也是 100%。</p>
+<table>
+<tr><th>任务</th>{"".join(f"<th>{t}</th>" for t, _o, _n, _s in STACK['per_task'])}</tr>
+<tr><td class="left">通过 / 总数</td>{"".join(f"<td class='{'good' if o == n else 'warn'}'>{o}/{n}</td>" for _t, o, n, _s in STACK['per_task'])}</tr>
+<tr><td class="left">平均步数</td>{"".join(f"<td>{s:.0f}</td>" for _t, _o, _n, s in STACK['per_task'])}</tr>
+</table>
+<p>垛型：{STACK_PATTERNS[0]}；{STACK_PATTERNS[1]}；{STACK_PATTERNS[2]}。放置精度 xy 0.5–8.4 mm、
+落点高度恒为一个块高（40.0 mm）。垛型与顺序全部写在任务协议（<code>config/missions.json</code> 的 <code>on</code> 字段）里，换垛型不改代码。</p>
+<h3>改动成本（码垛 vs 分拣，同一仓库同一提交）</h3>
+<table>
+<tr><th style="width:22%">类别</th><th style="width:26%">新增/修改</th><th class="left">内容</th></tr>
+<tr><td class="left">技能层（核心）</td><td>+208 行</td><td class="left"><code>expert.py</code>：<code>grasp_block</code>（底部上方 12 mm 抓取）+ <code>place_on_top</code>（顶面释放 + 三条运输路线）+ <code>_stack_ok</code></td></tr>
+<tr><td class="left">原语层</td><td>+84/−6 行</td><td class="left"><code>api.py</code>：新原语 <code>stack</code> / <code>pick_and_stack</code>；物料/容器集合通用化</td></tr>
+<tr><td class="left">计划/代码生成</td><td>+230 行</td><td class="left"><code>schemas.py</code> 新 op + 参数别名；<code>codegen.py</code> 模板分支；<code>planner.py</code> 码垛 fallback 计划；<code>prompts.py</code> 能力卡双套件</td></tr>
+<tr><td class="left">任务定义</td><td>+284 行</td><td class="left"><code>gen_stack_suite.py</code>（场景/垛型/套件注册）+ <code>gen_missions.py</code> 支持 <code>On</code> 目标</td></tr>
+<tr><td class="left">资产</td><td>+208 行 + 1 个对象</td><td class="left"><code>vendor/wood-stack/</code>：立方体 XML 生成 + 对象注册 + 幂等安装</td></tr>
+<tr><td class="left">自检/复现</td><td>+30 行</td><td class="left"><code>preflight.py</code> 增加码垛 3 项检查；<code>bootstrap_env.sh</code> 增加码垛三步</td></tr>
+<tr><td class="left"><b>零改动复用</b></td><td><b>0 行</b></td><td class="left">编排层（六阶段）、执行沙箱（AST 白名单）、评测协议、安全层、人确认门控、报告生成</td></tr>
+</table>
+<p class="note"><b>合计新增/修改代码 ≈ 1,224 行</b>（tracked +601/−59，新文件 623），其中真正的控制逻辑只有 <b>292 行</b>；
+新增 <b>1 个对象资产</b>、<b>1 个配置字段</b>（mission 的 <code>on</code>）+ 11 条任务协议。
+分拣套件回归（模板代码口径）：<code>libero_bolt_v2</code> 98.0%（t6 大螺栓 8/10）、<code>libero_bolt_multi</code> 72.7%，与旧口径（100% / 71.8%，LLM 代码）无明显回退。</p>
+<p><b>码垛专有的 6 个坑（A16–A21，已写入 docs/failures.md）</b>：①抓取点放几何中心 → 肘关节顶限位（手臂伸直=雅可比奇异）、
+控制器<b>无法回缩</b>，改成抓底面以上 12 mm；②工作空间“舒适带”：右侧 x &gt; +0.10 处的工件抓后放不到位，工位重排；
+③释放间隙要按<b>指尖</b>算（指尖低于工件底面）10 → 22 mm；④运输高度要按<b>当前垛顶</b>算而非桌面；
+⑤一旦顶到限位，后续任何路线都救不回来 → 安全路线优先；⑥从 bddl 反解 mission 要区分 <code>:init</code> 与 <code>:goal</code>。</p>
 
 <h2>四、视觉闭环（加分项 b）</h2>
 <p><code>AGENT_PERCEPTION=vision</code> 时，<code>scan()</code> 与抓放全部改走 RGB-D：颜色分割 + 深度反投影 + PCA 求长轴/长度分类，
@@ -210,11 +331,14 @@ HTML = f"""<!DOCTYPE html>
 决定落 <code>runtime/audit.jsonl</code>。一次 manual 运行实测：面板批准 12 次，episode 通过；四张截图
 （待确认 / 空闲 / 急停 / 夹爪闭合）见 <code>reports/screenshots/</code>。</p>
 
-<h2>七、演示视频（reports/videos/）</h2>
-<p>每条 episode 独立子进程 + 逐原语 trace，视频为 agentview 俯视（20 Hz，每 2 控制步取一帧）：</p>
+<h2>七、演示视频（≤ 5 分钟，1280×720）</h2>
+<p><b>视频链接：</b>{('<a href="' + VIDEO_URL + '">' + VIDEO_URL + '</a>') if VIDEO_URL else '见随包 <code>03_视频链接.txt</code>（网盘链接与提取码）'}</p>
+<p>成片 <code>reports/videos/AG-VLA-demo-720p.mp4</code>（4 分 39 秒，1280×720，25 fps）按“概述 → 主任务 → 变体 → 码垛 →
+视觉闭环 → 人确认 → 失败案例 → 复现”编排；每个片段都标注了实际加速倍率，画面右下角的时间轴可核对进度。
+原始素材是仿真回合录像（每条 episode 独立子进程 + 逐原语 trace）：</p>
 <ul>
-<li><b>成功</b>：v2 t0 / t1 / t5 / t6（含曾经的唯一失败 seed s1006）/ t9 / t10 双件、multi t3 三件、以及 <b>视觉闭环</b>一条（<code>t2_s1000_vision_ok.mp4</code>）。</li>
-<li><b>失败（如实保留）</b>：<code>libero_bolt_multi_t10_s1000_fail.mp4</code> —— 长程 4 件，3600 步预算耗尽。</li>
+<li><b>成功</b>：v2 t0 / t1 / t5 / t6（含曾经的唯一失败 seed s1006）/ t9 / t10 双件、multi t3 三件、码垛 t0 三层塔与 t10 双层双列、以及<b>视觉闭环</b>一条。</li>
+<li><b>失败（如实保留）</b>：<code>libero_bolt_multi_t10_s1000_fail.mp4</code> —— 长程 4 件，预算耗尽。</li>
 </ul>
 
 <h2>八、诚实边界（必须与数字一起看）</h2>
@@ -235,6 +359,7 @@ HTML = f"""<!DOCTYPE html>
 <tr><td class="left">主任务全量（主口径）</td><td class="left"><code>./run.sh --suite libero_bolt_v2 --taskbook taskbooks/sort_main.md --tasks 0..9 --seeds 10 --repairs 0</code></td></tr>
 <tr><td class="left">自动修复 A/B</td><td class="left">同上去掉 <code>--repairs 0</code>（会做配对子集复测 + 全量复测）</td></tr>
 <tr><td class="left">变体套件</td><td class="left"><code>./run.sh --suite libero_bolt_multi --taskbook taskbooks/sort_variant.md --tasks 0..10 --seeds 10</code></td></tr>
+<tr><td class="left">码垛套件（加分 c）</td><td class="left"><code>./run.sh --suite libero_wood_stack --taskbook taskbooks/stack_main.md --tasks 0..10 --seeds 10 --repairs 0</code></td></tr>
 <tr><td class="left">视觉闭环</td><td class="left"><code>AGENT_PERCEPTION=vision ./run.sh --suite libero_bolt_v2 --tasks 0,1,2,3,4 --seeds 4</code></td></tr>
 <tr><td class="left">人确认演示</td><td class="left"><code>python -m agent.confirm_server --port 8077</code> + <code>./run.sh --confirm-mode manual</code></td></tr>
 <tr><td class="left">无 LLM 回归</td><td class="left"><code>./run.sh --no-llm --tasks 5 --seeds 3</code></td></tr>
