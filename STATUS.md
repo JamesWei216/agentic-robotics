@@ -178,3 +178,22 @@ agentic-robotics/
 ./run.sh --suite libero_wood_stack --taskbook taskbooks/stack_main.md \
          --tasks 0,1,2,3,4,5,6,7,8,9,10 --seeds 10 --repairs 0
 ```
+
+---
+
+# 2026-10-23 · P0-2 / P0-3 进展
+
+**参赛信息（已落 `config/submission_meta.txt`，不入库）**：北京精密机电设备控制研究所 / AG-VLA智能机械臂 / 魏凤辰 / 19281081992
+
+## 已完成
+- `scripts/make_submission.sh` 改造：读 meta → 注入 `VIDEO_URL` 重生成 PDF → 只打包三件套（PDF + 02_代码 + 03_视频链接.txt）
+- `scripts/make_demo_video_720p.py`：**成片 4 分 39 秒 / 1280×720 / 25 fps / 18MB**（卡片 + 回合录像 + 指标面板 + 动态加速倍率）
+- 报告 PDF 扩到 **7 页**：新增「一·B Agent 证据链」（plan/code/trace/AST 拦截真实片段）、「三·B 码垛（加分 c）」含改动成本表、视频链接行、参赛抬头，KPI 四格（100% / 71.8% / 100% / 90%）
+- 提交包已生成：`~/Desktop/提交包-20261023/北京精密机电设备控制研究所-AG-VLA智能机械臂-魏凤辰-19281081992-20261023.zip`（5.8MB）
+
+## 唯一未完成：视频链接
+官方要求 PDF 内含 ≤5min / ≥720P 视频链接。成片已就绪，缺**上传渠道**：
+- 方案 A（推荐）：James 上传百度网盘/B 站 → 把链接（+提取码）给我 → 我执行
+  `echo "<URL> 提取码: xxxx" > config/video_link.txt && bash scripts/make_submission.sh`
+- 方案 B：授权我用 GitHub Release 发（`gh` 未安装，需 token）→ 链接形如
+  `https://github.com/JamesWei216/agentic-robotics/releases/download/v1.2-stack/AG-VLA-demo-720p.mp4`
