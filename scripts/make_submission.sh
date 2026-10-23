@@ -16,10 +16,22 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ORG="${1:-}"; WORK="${2:-}"; LEADER="${3:-}"; PHONE="${4:-}"
+
+# 默认从 config/submission_meta.txt 读（不入库），命令行参数优先
+META="$ROOT/config/submission_meta.txt"
+if [ -f "$META" ]; then set -a; . "$META"; set +a; fi
+ORG="${1:-${ORG:-}}"; WORK="${2:-${WORK:-}}"; LEADER="${3:-${LEADER:-}}"; PHONE="${4:-${PHONE:-}}"
 PDF="${5:-$ROOT/reports/Agentic-Robotics-赛题总结报告.pdf}"
 DATE="$(date +%Y%m%d)"
 STAMP="$(date +%Y-%m-%d)"
+
+# 视频链接（官方要求 PDF 里必须含 ≤5min / ≥720P 视频链接）
+VIDEO_FILE="$ROOT/reports/videos/AG-VLA-demo-720p.mp4"
+VIDEO_LINK_FILE="$ROOT/config/video_link.txt"
+VIDEO_URL=""
+if [ -f "$VIDEO_LINK_FILE" ]; then
+  VIDEO_URL="$(grep -Eo 'https?://[^[:space:]]+' "$VIDEO_LINK_FILE" | head -1 || true)"
+fi
 
 if [ -z "$ORG" ] || [ -z "$WORK" ] || [ -z "$LEADER" ] || [ -z "$PHONE" ]; then
   cat >&2 <<'EOF'
@@ -34,10 +46,24 @@ NAME="$ORG-$WORK-$LEADER-$PHONE-$DATE"
 OUT="$HOME/Desktop/提交包-$DATE"
 rm -rf "$OUT"; mkdir -p "$OUT/02_代码"
 
-echo "== 1. 技术文档 =="
+# 找得到 weasyprint 的解释器（venv/conda 均可能）
+if [ -z "${PDF_PYTHON:-}" ]; then
+  for cand in "$(command -v python3)" /home/wei/miniconda3/envs/smolvla/bin/python /home/wei/miniconda3/envs/vla/bin/python; do
+    [ -x "$cand" ] || continue
+    if "$cand" -c "import weasyprint" >/dev/null 2>&1; then PDF_PYTHON="$cand"; break; fi
+  done
+fi
+PDF_PYTHON="${PDF_PYTHON:-python3}"
+
+echo "== 1. 技术文档（注入视频链接后重新生成） =="
+if [ -z "$VIDEO_URL" ]; then
+  echo "   !! config/video_link.txt 里没找到 http(s) 链接：PDF 会写成“见 03_视频链接.txt”" >&2
+fi
+SUB_ORG="$ORG" SUB_WORK="$WORK" SUB_LEADER="$LEADER" VIDEO_URL="$VIDEO_URL" \
+  "$PDF_PYTHON" "$ROOT/scripts/make_report_pdf.py" >/dev/null
 if [ -f "$PDF" ]; then
   cp "$PDF" "$OUT/01_技术文档.pdf"
-  echo "   $PDF -> 01_技术文档.pdf"
+  echo "   重新生成并复制 -> 01_技术文档.pdf（video_url=${VIDEO_URL:-<空>}）"
 else
   echo "   !! 找不到 PDF: $PDF" >&2; exit 1
 fi
@@ -70,15 +96,29 @@ cp "$ROOT/docs/运行方式.md" "$OUT/02_代码/运行方式.md" 2>/dev/null \
   || cp "$ROOT/docs/setup.md" "$OUT/02_代码/运行方式.md"
 
 echo "== 5. 视频链接 =="
-if [ -f "$ROOT/config/video_link.txt" ]; then
-  cp "$ROOT/config/video_link.txt" "$OUT/03_视频链接.txt"
-  echo "   已带上视频链接"
+if [ -f "$VIDEO_LINK_FILE" ]; then
+  cp "$VIDEO_LINK_FILE" "$OUT/03_视频链接.txt"
+  echo "   已带上视频链接（$VIDEO_URL）"
 else
-  echo "   (待补：config/video_link.txt)" > "$OUT/03_视频链接.txt"
+  {
+    echo "作品介绍视频：待上传后填入"
+    echo
+    echo "成片文件：$(basename "$VIDEO_FILE")"
+    echo "规格：4 分 39 秒 / 1280×720 / 25 fps / H.264（满足 ≤5 分钟、≥720P）"
+    echo "建议渠道：百度网盘（附提取码）或 B 站（公开视频 URL）"
+    echo
+    echo "上传后把链接写进 $VIDEO_LINK_FILE（一行 URL，可附提取码），重跑本脚本即自动注入 PDF。"
+  } > "$OUT/03_视频链接.txt"
+  echo "   (待补：$VIDEO_LINK_FILE)"
+fi
+# 视频成片放桌面包旁边（不进 zip，便于直接上传）
+if [ -f "$VIDEO_FILE" ]; then
+  cp "$VIDEO_FILE" "$OUT/AG-VLA-demo-720p.mp4"
+  echo "   成片已复制到包旁：AG-VLA-demo-720p.mp4（$(du -h "$VIDEO_FILE" | cut -f1)）"
 fi
 
 echo "== 6. 打包 =="
-( cd "$OUT" && zip -qr "$NAME.zip" . -x '*.zip' )
+( cd "$OUT" && zip -qr "$NAME.zip" 01_技术文档.pdf 02_代码 03_视频链接.txt )
 ls -lh "$OUT/$NAME.zip"
 echo
 echo "上传文件: $OUT/$NAME.zip"

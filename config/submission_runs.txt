@@ -1,8 +1,19 @@
 # 提交包内“关键运行”清单（make_submission.sh 读取）
 # 每行一个 runs/<run_id>；# 开头为注释；mp4 不进包（视频单独走网盘）
+
+# —— 分拣主任务（主口径 100%）与变体 ——
 20261018-134900_v2_carry
 20261018-134855_multi_carry
+# —— 视觉闭环（加分 b）与人确认面板（加分 d）——
 20261018-135739_vision_regionfix
-20261018-104215_v2_final2
 confirm_demo_panel
+# —— 可复现性：干净环境自检 ——
 20261018-152511_cleanenv_check
+
+# —— 码垛套件（加分 c，2026-10-23）——
+20261023-211446_stack_full
+20261023-213049_stack_llm_v2
+20261023-213228_stack_demo
+# —— 2026-10-23 分拣回归（确认码垛改动没有回退）——
+20261023-211727_v2_recheck_stackwork
+20261023-212018_multi_recheck_stackwork

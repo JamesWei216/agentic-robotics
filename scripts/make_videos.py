@@ -53,7 +53,7 @@ def main():
         print(f"  {name}  {kb} KB")
     (OUT / "README.md").write_text(
         "# 演示视频\n\n"
-        f"套件 `{SUITE}`，代码 `{code.relative_to(ROOT)}`，每条 episode 独立进程 + 逐原语 trace。\n\n"
+        f"套件 `{SUITE}`，代码 `{code}`，每条 episode 独立进程 + 逐原语 trace。\n\n"
         + "\n".join(f"- `{n}`（{kb} KB）" for n, kb in made) + "\n")
 
 

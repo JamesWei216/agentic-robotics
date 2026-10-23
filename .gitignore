@@ -20,3 +20,6 @@ env/
 
 # 运行时审计日志（不入库，样本见 docs/audit_sample.jsonl）
 runtime/
+# 提交包元信息（含队长手机号，不入库）
+config/submission_meta.txt
+config/video_link.txt
