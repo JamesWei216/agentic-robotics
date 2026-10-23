@@ -119,3 +119,20 @@ $PY scripts/preflight.py                    # 环境自检（7 项）
 $PY scripts/check_feasibility.py libero_bolt_v2 10   # 110/110 布局可行
 ./run.sh --suite libero_bolt_v2 --taskbook taskbooks/sort_main.md --tasks 0,1,2,3,4,5,6,7,8,9 --seeds 10 --repairs 0
 ```
+
+---
+
+# 2026-10-23 追加：码垛套件（加分 c「码垛 ↔ 分拣切换 + 改动成本可量化」）
+
+详见 `docs/stacking.md`。要点：
+
+| 口径 | 套件 | 结果 | 平均步数 |
+|---|---|---|---|
+| 模板代码（`--no-llm`，确定性） | `libero_wood_stack` 11 任务 × 10 seed = 110 | **100.0%（110/110）** | 564 |
+| LLM 全链路（DeepSeek 出计划 + 出代码） | 4 任务 × 2 seed = 8 | **100.0%（8/8）** | 618 |
+
+- 垛型 3 种：3 层直塔（t0–t4）、2 层塔（t5–t9）、双层双列 4 块（t10）；成功判定用 LIBERO 原生 `On(top, base)`（接触 + z 序 + xy < 30 mm），**无自写判定脚本**。
+- 放置精度 0.5–8.4 mm xy、落点高度恒为一个块高（40.0 mm）。
+- **改动成本**：新增/修改代码 ≈1,224 行（tracked +601/−59 + 新文件 623），其中真正控制逻辑 **292 行**（`expert.py` 208 + `api.py` 84）；新增 1 个对象资产、1 个配置字段（mission 的 `on`）+ 11 条任务协议；编排/执行/评测/安全/人确认/报告层**零改动**。
+- 分拣回归（no-LLM 模板口径）：`libero_bolt_v2` 98.0%（t6 大螺栓 8/10）、`libero_bolt_multi` 72.7%（对照 10-18 LLM 口径 100% / 71.8%）→ 无明显回退。
+- 新增 6 个坑（A16–A21，见 `docs/failures.md`）：抓取高度导致肘关节奇异、工作空间舒适带 x ≤ +0.10、释放间隙要按指尖算、运输高度按垛顶算、限位后不可恢复、mission 解析要区分 init/goal。

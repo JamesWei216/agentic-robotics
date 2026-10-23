@@ -23,7 +23,13 @@ from libero.libero import get_libero_path  # noqa: E402
 from libero.libero.benchmark import get_benchmark_dict  # noqa: E402
 
 OUT = pathlib.Path(__file__).resolve().parents[1] / "config" / "missions.json"
-GOAL_RE = re.compile(r"\(In\s+(\S+)\s+(\S+?)_contain_region\)")
+# Two goal shapes are supported:
+#   (In  <object> <bin>_contain_region)  -> sorting : {"object", "bin"}
+#   (On  <top>    <base>)                -> stacking: {"object", "on"}
+# Order is kept as written in the bddl, which is dependency order for stacks.
+GOAL_RE = re.compile(
+    r"\(In\s+([^\s()]+)\s+([^\s()]+?)_contain_region\)|\(On\s+([^\s()]+)\s+([^\s()]+)\)"
+)
 
 
 def main(suites):
@@ -37,7 +43,13 @@ def main(suites):
             task = suite.get_task(i)
             bddl = root / suite_name / task.bddl_file
             text = bddl.read_text()
-            pairs = [{"object": obj, "bin": f"{bin_}"} for obj, bin_ in GOAL_RE.findall(text)]
+            pairs = []
+            for obj, bin_, top, base in GOAL_RE.findall(text):
+                if obj:
+                    pairs.append({"object": obj, "bin": bin_})
+                elif not base.endswith("_init_region"):
+                    # (:init (On obj obj_init_region)) lines are placements, not goals
+                    pairs.append({"object": top, "on": base})
             per_task[str(i)] = pairs
             print(f"{suite_name}[{i:2d}] {task.language[:52]:52s} {pairs}")
         data[suite_name] = per_task

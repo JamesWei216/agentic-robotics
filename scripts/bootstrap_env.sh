@@ -100,15 +100,20 @@ step 4 "生成 libero_bolt（第一版单件任务套件）"
 $PY vendor/bolt-sorting/create_bolt_tasks.py
 $PY vendor/bolt-sorting/install.py --libero "$LIBERO_ROOT" --skip-assets --skip-galaxea
 
-step 5 "生成比赛套件 libero_bolt_v2 + libero_bolt_multi"
+step 5 "生成比赛套件 libero_bolt_v2 + libero_bolt_multi + libero_wood_stack"
 $PY scripts/gen_suites.py
+# 码垛套件（加分 c）：木块资产 + 对象注册 + 套件生成
+$PY vendor/wood-stack/gen_assets.py
+$PY vendor/wood-stack/install.py --libero "$LIBERO_ROOT"
+$PY scripts/gen_stack_suite.py
 
 step 6 "采样固定初始状态（每个任务 50 个，seed 公开）"
 $PY scripts/gen_init_states.py --suite libero_bolt_v2 --num 50
 $PY scripts/gen_init_states.py --suite libero_bolt_multi --num 50
+$PY scripts/gen_init_states.py --suite libero_wood_stack --num 50
 
 step 7 "生成任务协议 config/missions.json"
-$PY scripts/gen_missions.py libero_bolt_v2 libero_bolt_multi
+$PY scripts/gen_missions.py libero_bolt_v2 libero_bolt_multi libero_wood_stack
 
 # ---------------------------------------------------------------- 8. 自检
 step 8 "preflight 自检（7 项）"

@@ -33,8 +33,9 @@ FORBIDDEN_MODULES = {
     "http", "importlib", "ctypes", "pickle", "multiprocessing", "threading",
 }
 ALLOWED_METHODS = {
-    "settle", "scan", "pick", "place", "pick_and_place", "home", "check",
-    "confirm", "log", "todo", "close", "stats",
+    "settle", "scan", "pick", "place", "pick_and_place",
+    "stack", "pick_and_stack",
+    "home", "check", "confirm", "log", "todo", "close", "stats",
 }
 
 
@@ -95,7 +96,7 @@ from agent.skills.api import Robot
 
 
 def sort_one(R, obj, box):
-    """Pick `obj` and drop it in `box`, with one retry on grasp failure."""
+    """Sorting: pick `obj` and drop it in `box`, with one retry on failure."""
     for attempt in (1, 2):
         try:
             R.log("attempt %d: %s -> %s" % (attempt, obj, box), object=obj, target=box)
@@ -108,17 +109,32 @@ def sort_one(R, obj, box):
     return False
 
 
+def stack_one(R, obj, base):
+    """Stacking: pick `obj` and release it on top of `base`."""
+    for attempt in (1, 2):
+        try:
+            R.log("attempt %d: %s on %s" % (attempt, obj, base), object=obj, target=base)
+            ok = R.pick_and_stack(obj, base)
+            return bool(ok)
+        except RuntimeError as exc:
+            R.log("grasp/stack failure: %s" % exc, object=obj, attempt=attempt)
+            R.settle(15)
+    return False
+
+
 def run():
     R = Robot.from_env()
     placed, failed = [], []
     try:
-        R.log("plan loaded: settle -> scan -> sort each todo pair -> check -> home")
+        R.log("plan loaded: settle -> scan -> handle each todo item -> check -> home")
         R.settle(30)
-        R.scan("bolt")
         R.confirm("first_motion")
         for item in R.todo():
-            obj, box = item["object"], item["bin"]
-            (placed if sort_one(R, obj, box) else failed).append(obj)
+            obj = item.get("object")
+            if item.get("on"):
+                (placed if stack_one(R, obj, item["on"]) else failed).append(obj)
+            else:
+                (placed if sort_one(R, obj, item["bin"]) else failed).append(obj)
         ok = R.check()
         R.home()
         R.log("finished", success=ok, placed=placed, failed=failed, **R.stats())

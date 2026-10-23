@@ -19,6 +19,7 @@ import atexit
 import json
 import os
 import pathlib
+import re
 import sys
 import time
 
@@ -150,8 +151,10 @@ class Robot:
         return self._mission_from_env()
 
     def todo(self) -> list[dict]:
-        """What this episode requires: a list of {object, bin} pairs (copy)."""
-        self.emit("todo", items=[f"{m['object']}->{m['bin']}" for m in self.mission])
+        """What this episode requires: {object,bin} (sorting) or {object,on} (stacking)."""
+        self.emit("todo", items=[
+            f"{m['object']}->{m['bin']}" if m.get("bin") else f"{m['object']}=>on {m.get('on')}"
+            for m in self.mission])
         return [dict(m) for m in self.mission]
 
     # ------------------------------------------------------------------ trace
@@ -221,7 +224,7 @@ class Robot:
         for name in _scene_objects(self.env):
             if name not in self.u.obj_body_id:
                 continue
-            label = name.split("_1")[0]
+            label = re.sub(r"_\d+$", "", name)
             if category == "all":
                 pass
             elif category == "bolt":
@@ -272,14 +275,24 @@ class Robot:
         self.emit("settle", n=steps)
 
     def _bolts(self) -> list[str]:
-        if PERCEPTION_MODE == "vision":
+        """Movable objects this episode may pick (bolts or wooden blocks)."""
+        if self.mission:
             return [m["object"] for m in self.mission]
-        return [n for n in _scene_objects(self.env) if n.startswith("bolt")]
+        return [n for n in _scene_objects(self.env) if not n.startswith(BIN_PREFIX)]
 
     def _bins(self) -> list[str]:
-        if PERCEPTION_MODE == "vision":
-            return sorted({m["bin"] for m in self.mission})
+        if self.mission:
+            return sorted({m["bin"] for m in self.mission if m.get("bin")})
         return [n for n in _scene_objects(self.env) if n.startswith(BIN_PREFIX)]
+
+    def _stack_targets(self) -> list[str]:
+        """Objects this episode must stack something onto (stacking missions)."""
+        return sorted({m["on"] for m in self.mission if m.get("on")})
+
+    @staticmethod
+    def _is_block(name: str) -> bool:
+        """Wooden cube -> uses the cube grasp/stack branch instead of the bolt one."""
+        return name.startswith("wood_block")
 
     def _check_object(self, name: str, *, allowed) -> None:
         if name not in allowed:
@@ -303,10 +316,15 @@ class Robot:
         if PERCEPTION_MODE == "vision":
             # closed loop: re-measure everything right before the grasp
             self._perceive()
-        self.safety.guard_point(self.ex.grasp_point(object), label=f"grasp:{object}")
+        grasp_point = (self.ex.block_center(object) if self._is_block(object)
+                       else self.ex.grasp_point(object))
+        self.safety.guard_point(grasp_point, label=f"grasp:{object}")
         self.gate.require("grasp_close", {"object": object})
         try:
-            ok, _log = self.ex.grasp(object)
+            if self._is_block(object):
+                ok, _log = self.ex.grasp_block(object)
+            else:
+                ok, _log = self.ex.grasp(object)
         except EpisodeDone:
             self.emit("pick", object=object, grasped=None, note="episode_terminated")
             return True
@@ -359,6 +377,54 @@ class Robot:
         self.settle(30)
         self.pick(object)
         return self.place(object, bin)
+
+    # ------------------------------------------------------------- stacking
+    def stack(self, object: str, on: str) -> bool:
+        """Carry `object` and release it on top of `on` (码垛).
+
+        The success criterion is the simulator's native `On(object, on)`
+        predicate; the primitive only reports its own local check so the caller
+        can decide whether to retry.
+        """
+        self._check_object(object, allowed=self._bolts())
+        self._check_object(on, allowed=self._stack_targets())
+        if PERCEPTION_MODE == "vision":
+            raise RuntimeError(
+                "stacking runs with privileged poses only: the RGB-D detector in "
+                "agent/skills/perception.py segments steel bolts, not wooden cubes")
+        if self._episode_done("stack"):
+            return bool(self._success)
+        self._arm_once()
+        self.gate.require("release", {"object": object, "target": on})
+        try:
+            ok, _log = self.ex.place_on_top(on)
+        except EpisodeDone:
+            ok = bool(self.u._check_success())
+        if not ok and not self._episode_done("stack"):
+            # same budget-guarded single retry as place(): a re-grasp + carry on
+            # a 3-block tower costs ~450-700 steps of a shared horizon
+            left = int(getattr(self.u, "horizon", 0)) - int(getattr(self.u, "timestep", 0))
+            if left < 500:
+                self.emit("stack_retry_skipped", object=object, steps_left=left)
+                self.emit("stack", object=object, on=on, success=False)
+                return False
+            self.emit("stack_retry", object=object, on=on, steps_left=left)
+            try:
+                self.ex.grasp_block(object)
+                ok, _log = self.ex.place_on_top(on)
+            except (RuntimeError, KeyError, EpisodeDone) as exc:
+                self.emit("stack_retry_failed", object=object, error=str(exc)[:160])
+                ok = bool(self.u._check_success())
+        self.emit("stack", object=object, on=on, success=bool(ok))
+        self._just_placed = True
+        return bool(ok)
+
+    def pick_and_stack(self, object: str, on: str) -> bool:
+        self._check_object(object, allowed=self._bolts())
+        self._check_object(on, allowed=self._stack_targets())
+        self.settle(30)
+        self.pick(object)
+        return self.stack(object, on)
 
     def home(self) -> None:
         if self._episode_done("home"):

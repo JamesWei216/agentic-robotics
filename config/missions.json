@@ -262,5 +262,97 @@
         "bin": "parts_bin_red_1"
       }
     ]
+  },
+  "libero_wood_stack": {
+    "0": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      },
+      {
+        "object": "wood_block_3",
+        "on": "wood_block_2"
+      }
+    ],
+    "1": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      },
+      {
+        "object": "wood_block_3",
+        "on": "wood_block_2"
+      }
+    ],
+    "2": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      },
+      {
+        "object": "wood_block_3",
+        "on": "wood_block_2"
+      }
+    ],
+    "3": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      },
+      {
+        "object": "wood_block_3",
+        "on": "wood_block_2"
+      }
+    ],
+    "4": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      },
+      {
+        "object": "wood_block_3",
+        "on": "wood_block_2"
+      }
+    ],
+    "5": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      }
+    ],
+    "6": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      }
+    ],
+    "7": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      }
+    ],
+    "8": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      }
+    ],
+    "9": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      }
+    ],
+    "10": [
+      {
+        "object": "wood_block_2",
+        "on": "wood_block_1"
+      },
+      {
+        "object": "wood_block_4",
+        "on": "wood_block_3"
+      }
+    ]
   }
 }
