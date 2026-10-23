@@ -24,6 +24,15 @@ class PlanResult:
     error: str | None = None
 
 
+def _pair_desc(pair: dict) -> str:
+    """One mission item -> human-readable line (sorting uses bin, stacking uses on)."""
+    if pair.get("bin"):
+        return f"{pair['object']} -> {pair['bin']}"
+    if pair.get("on"):
+        return f"{pair['object']} stacked on {pair['on']}"
+    return str(pair)
+
+
 def scene_hint(suite: str = "libero_bolt") -> str:
     """Ground the planner in the actual task protocol of the suite."""
     path = ROOT / "config" / "missions.json"
@@ -32,19 +41,23 @@ def scene_hint(suite: str = "libero_bolt") -> str:
     data = json.loads(path.read_text()).get(suite, {})
     lines = [f"SUITE `{suite}` — {len(data)} tasks; each episode requires:"]
     for idx, pairs in list(data.items())[:12]:
-        desc = ", ".join(f"{p['object']} -> {p['bin']}" for p in pairs) or "nothing"
+        desc = ", ".join(_pair_desc(p) for p in pairs) or "nothing"
         lines.append(f"  task {idx:>2}: {desc}")
-    lines.append("At runtime the generated script must read R.todo() and sort every "
-                 "pair listed there (one object at a time).")
+    lines.append("At runtime the generated script must read R.todo() and handle every "
+                 "item listed there, one object at a time (place it in the named bin, "
+                 "or stack it on the named object).")
     return "\n".join(lines)
 
 
-def _fallback_plan(taskbook: str) -> dict:
+def _fallback_plan(taskbook: str, suite: str = "libero_bolt") -> dict:
     """Deterministic plan used when the LLM output cannot be validated.
 
     Keeps the pipeline runnable: the plan still carries steps / constraints /
-    risks, just authored by a template instead of the model.
+    risks, just authored by a template instead of the model. There is one
+    template per task type (sorting / stacking) selected by the suite name.
     """
+    if suite.startswith("libero_wood_stack"):
+        return _fallback_stack_plan(taskbook)
     return {
         "task": {
             "name": "bolt sorting (fallback plan)",
@@ -102,6 +115,75 @@ def _fallback_plan(taskbook: str) -> dict:
     }
 
 
+def _fallback_stack_plan(taskbook: str) -> dict:
+    """Deterministic plan for the stacking (码垛) suite."""
+    return {
+        "task": {
+            "name": "wood block stacking (fallback plan)",
+            "goal": "Stack every wooden block listed by R.todo() onto the block "
+                    "named in the same item, building the required tower.",
+            "success_criteria": [
+                "On(top, base) holds for every pair returned by R.todo()",
+                "robot returns to the home pose after the last placement",
+            ],
+        },
+        "scene": {
+            "objects": ["wood_block_1", "wood_block_2", "wood_block_3"],
+            "targets": {"wood_block_2": "wood_block_1", "wood_block_3": "wood_block_2"},
+            "workcell": "LIBERO tabletop, Franka Panda + parallel jaw, table z=0.90 m, "
+                        "40 mm wooden cubes",
+        },
+        "steps": [
+            {"id": 1, "op": "settle", "args": {"steps": 30},
+             "purpose": "let the cubes settle after reset before any pose is read",
+             "on_failure": "abort episode, report scene instability"},
+            {"id": 2, "op": "scan", "args": {"category": "wood_block"},
+             "purpose": "confirm which blocks are present", "on_failure": "fall back to R.todo()"},
+            {"id": 3, "op": "pick_and_stack",
+             "args": {"object": "wood_block_2", "on": "wood_block_1"},
+             "purpose": "place the second block on the base block",
+             "on_failure": "log grasp failure and retry once"},
+            {"id": 4, "op": "pick_and_stack",
+             "args": {"object": "wood_block_3", "on": "wood_block_2"},
+             "purpose": "place the third block on top of the second",
+             "on_failure": "log grasp failure and retry once"},
+            {"id": 5, "op": "check", "args": {},
+             "purpose": "verify the On() predicates", "on_failure": "report failure stage"},
+            {"id": 6, "op": "home", "args": {}, "purpose": "leave the arm at a safe pose",
+             "on_failure": "none"},
+        ],
+        "constraints": [
+            {"id": "C1", "text": "end effector never below z=0.86 m", "enforced_by": "safety layer"},
+            {"id": "C2", "text": "lift >= 100 mm before lateral motion", "enforced_by": "primitive place_on_top"},
+            {"id": "C3", "text": "carry speed <= 0.015 m/step", "enforced_by": "primitive move_to"},
+            {"id": "C4", "text": "release <= 10 mm above the target block top face", "enforced_by": "primitive place_on_top"},
+            {"id": "C5", "text": "one block at a time, bottom-up order", "enforced_by": "plan structure + R.todo()"},
+        ],
+        "risks": [
+            {"id": "R1", "text": "cube slips out of the parallel jaws during the carry",
+             "mitigation": "grasp at centre height, lift slowly, 0.015 m/step cap",
+             "detect": "grasp_ok == false / On() false"},
+            {"id": "R2", "text": "stack placed more than 30 mm off centre -> On() never true",
+             "mitigation": "descend in two stages with 0.008 m/step and settle 30 steps",
+             "detect": "stack success == false"},
+            {"id": "R3", "text": "tower topples after release",
+             "mitigation": "release 10 mm above the top face, no lateral motion while descending",
+             "detect": "On() false after the settle steps"},
+            {"id": "R4", "text": "upper block pushed off when picking it next to a standing tower",
+             "mitigation": "always approach from above; keep >= 100 mm clearance over the stack",
+             "detect": "On() false for a pair that was already true"},
+        ],
+        "confirmations": [
+            {"action": "first_motion", "when": "before the first motion after reset", "mode": "auto"},
+            {"action": "grasp_close", "when": "before closing the jaws", "mode": "auto"},
+            {"action": "release", "when": "before opening the jaws above the stack", "mode": "auto"},
+        ],
+        "metrics": ["success_rate", "cycle_steps", "confirmation_count", "repair_count"],
+        "runtime_binding": "steps 3/4 are bound to R.todo() at runtime (2- or 4-placement episodes)",
+        "source_taskbook": taskbook[:120],
+    }
+
+
 def make_plan(taskbook_path: str | pathlib.Path, *, suite: str = "libero_bolt",
               model: str | None = None, retries: int = 1) -> PlanResult:
     taskbook = pathlib.Path(taskbook_path).read_text()
@@ -120,7 +202,7 @@ def make_plan(taskbook_path: str | pathlib.Path, *, suite: str = "libero_bolt",
             return PlanResult(validate_plan(raw), "llm", attempts)
         except Exception as e:  # noqa: BLE001
             last_error = f"{type(e).__name__}: {e}"
-    return PlanResult(_fallback_plan(taskbook), "fallback", attempts, last_error)
+    return PlanResult(_fallback_plan(taskbook, suite), "fallback", attempts, last_error)
 
 
 if __name__ == "__main__":

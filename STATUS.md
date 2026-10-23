@@ -146,3 +146,35 @@ agentic-robotics/
 ### 需要 James 提供
 - 官方《任务说明包》（**分拣物料是否含螺母**最重要；还有最低指标数值、工位尺寸/垛型）
 - 提交包命名 4 个字段；网盘账号
+
+---
+
+# 2026-10-23 · P1-1 码垛套件完成（加分 c）
+
+**代码**：`scripts/gen_stack_suite.py` + `vendor/wood-stack/` + 技能层 `place_on_top`（详见 `docs/stacking.md`）
+**结果**：`libero_wood_stack` 11 任务 × 10 seed = **100.0%（110/110）**，均 564 步；LLM 全链路 8/8 = 100%
+**回归**：`libero_bolt_v2` 98.0%（模板口径，t6 8/10）、`libero_bolt_multi` 72.7%（对照 LLM 口径 100% / 71.8%）
+
+### 新增文件
+- `scripts/gen_stack_suite.py`、`scripts/probe_stack.py`、`taskbooks/stack_main.md`
+- `vendor/wood-stack/{gen_assets,libero_wood_objects,install}.py`
+- `docs/stacking.md`（设计 + 改动成本表 + A16–A21）
+
+### 改动文件
+`agent/skills/expert.py`(+208) `agent/skills/api.py`(+84/−6) `agent/schemas.py` `agent/codegen.py`
+`agent/planner.py` `agent/prompts.py` `agent/run.py` `scripts/gen_missions.py` `scripts/preflight.py`
+`scripts/bootstrap_env.sh` `config/missions.json`
+
+### 明天/接下来（按优先级）
+1. **P0-2 提交包**：需要 James 给 单位简称 / 作品名称 / 队长姓名 / 队长手机号（命名规则硬性）
+2. **P0-3 视频成片（≤5 min，≥720P）+ 网盘链接**：素材齐（演示片 + 逐 episode 日志），缺叙事剪辑与上传
+3. **P1-3 报告口径与证据链**：人确认措辞改官方口径、Agent 证据链章节、无隐藏测试集声明、失败案例章节（A6/A11–A21）
+   → PDF 目标 12–15 页（现 5 页），把 `docs/stacking.md` 的改动成本表整段搬进去
+4. **P1-2 变体 72.7% → ≥85%**（分层子目标编排 + 邻件遮挡检查），对冲未知最低指标
+5. 可选：`libero_wood_stack` 也做一次视觉闭环？**不做**——感知模块只分割钢色螺栓，木块没有检测器（已在代码里显式报错）
+
+### 复现命令（码垛）
+```bash
+./run.sh --suite libero_wood_stack --taskbook taskbooks/stack_main.md \
+         --tasks 0,1,2,3,4,5,6,7,8,9,10 --seeds 10 --repairs 0
+```

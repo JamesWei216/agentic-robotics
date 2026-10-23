@@ -27,6 +27,10 @@ BOLTS = {
     "bolt_small": dict(T=0.062, H_h=0.010, shank_l=0.052, AF=0.022, shank_d=0.013),
     "bolt_large": dict(T=0.103, H_h=0.018, shank_l=0.085, AF=0.038, shank_d=0.024),
 }
+# wooden cube used by the stacking (码垛) suite; must match
+# vendor/wood-stack/gen_assets.py. The asset origin is the centre of the bottom
+# face, so centre = pos + edge/2 and top face = pos + edge.
+BLOCK = dict(edge=0.040)
 POS_SCALE = 0.05      # controller output_max[:3]
 
 
@@ -50,6 +54,10 @@ class Expert:
         self.refresh_vision = None
         self.last_obs = None          # callable -> most recent obs dict
         self.verbose_vision = False
+        # EE pose right after reset: the one configuration the OSC always handles
+        # cleanly. Used as a "re-center" waypoint before a stack placement.
+        self.home_pos = self.ee()[0].copy()
+        self.home_ori = self.ee()[1].copy()
 
     # ------------------------------------------------------------------ utils
     def body_pos(self, name):
@@ -355,6 +363,206 @@ class Expert:
 
         self._held = dict(bolt=bolt, head=head, R_grasp=R_grasp, lift_h=lift_h)
         return held, log
+
+    # ------------------------------------------------------- stacking (码垛)
+    def block_center(self, name):
+        """World position of the block centre (asset origin = bottom centre)."""
+        return self.body_pos(name) + np.array([0.0, 0.0, BLOCK["edge"] / 2.0])
+
+    def block_top(self, name):
+        """World position of the middle of the block's top face."""
+        return self.body_pos(name) + np.array([0.0, 0.0, BLOCK["edge"]])
+
+    def stack_orientation(self):
+        """EE orientation for a cube: jaws close along the world y axis.
+
+        Same gripper facts as grasp_orientation(): z_ee stays (0,0,-1) for a
+        straight-down approach and the jaws close along x_ee.  Passing the world
+        **x** axis as the "axis to straddle" therefore puts x_ee along y.
+
+        This choice is not cosmetic.  A cube is symmetric, so both jaw directions
+        grasp equally well, but the *arm* is not: with the jaws along x the IK
+        branch chosen by the OSC cannot translate the EE in -x at stack height
+        (measured t0 s1000/s1001: 115-135 mm short of the target, j4 pinned at its
+        0.07 rad limit and the EE drifting +z instead of -x).  Rotating the same
+        grasp 90 deg fixes it: dxy 12 mm, and the bent-arm route converges.
+        """
+        return self.grasp_orientation(np.array([1.0, 0.0, 0.0]), R_cur=self.ee()[1])
+
+    def grasp_block(self, name, pre_h=0.10, lift_h=0.12, verbose=False,
+                    attempts=2, settle_steps=25, grasp_h=0.012):
+        """Top-down grasp of a cube near its bottom edge, verified by lift.
+
+        `grasp_h` is measured from the block's bottom face, not from its centre.
+        This matters: grasping at centre height puts the EE ~136 mm above the
+        table, which is at the Panda's maximum extension for the far pick cells —
+        q4 pins at its -0.07 rad limit and the Cartesian controller then cannot
+        retract the arm at all (measured t5 s1001: unloaded retry stuck at the same
+        126 mm error).  Gripping 12 mm above the table keeps the elbow bent and
+        the whole workcell reachable.
+
+        Same verification contract as grasp(): the jaw encoder cannot tell
+        "closed on the part" from "closed on air", so the grasp is accepted only
+        if the block actually rises with the arm ~lift_h.
+        """
+        log = []
+        for _ in range(settle_steps):
+            self.step(np.zeros(3), np.zeros(3), -1.0)
+
+        held = False
+        R_grasp = self.stack_orientation()
+        for attempt in range(1, attempts + 1):
+            centre = self.block_center(name)
+            grip_pt = np.array([centre[0], centre[1], self.table_z + grasp_h])
+            z_before = self.body_pos(name)[2]
+            self.set_gripper(-1.0, steps=12)
+
+            tgt = grip_pt + np.array([0.0, 0.0, pre_h])
+            err = self.move_to(tgt, R_grasp, grip=-1.0, tol_p=0.015, max_steps=120)
+            if err[0] > 0.02:
+                # approaching from across the table the wrist can saturate; climb
+                # and re-approach instead of closing the jaws on air
+                lift_z = max(tgt[2], self.table_z + 0.30)
+                self.move_to(np.array([tgt[0], tgt[1], lift_z]), R_grasp, grip=-1.0,
+                             max_steps=150)
+                err = self.move_to(tgt, R_grasp, grip=-1.0, tol_p=0.015)
+            log.append((f"pre_grasp{attempt}", err))
+
+            err = self.move_to(grip_pt, R_grasp, grip=-1.0, tol_p=0.006,
+                               max_steps=90, speed=0.020)
+            log.append((f"descend{attempt}", err))
+
+            for _ in range(30):
+                self.step(np.zeros(3), np.zeros(3), 1.0)
+            jaw = float(np.abs(self.fingers_qpos()).mean())
+
+            err = self.move_to(grip_pt + np.array([0.0, 0.0, lift_h]), R_grasp,
+                               grip=1.0, max_steps=150, speed=0.015)
+            lifted = float(self.body_pos(name)[2] - z_before)
+            log.append((f"lift{attempt}", (err[0], err[1])))
+            held = lifted > 0.02
+            if verbose:
+                print(f"   [stack] attempt {attempt}: jaw={jaw:.4f} "
+                      f"lifted={lifted:.3f} held={held}")
+            if held:
+                break
+            self.set_gripper(-1.0, steps=10)
+            self.move_to(grip_pt + np.array([0.0, 0.0, pre_h]), R_grasp, grip=-1.0,
+                         max_steps=80)
+
+        self._held = dict(bolt=name, head=self.block_center(name),
+                          R_grasp=R_grasp, lift_h=lift_h)
+        return held, log
+
+    def place_on_top(self, target, clear_h=0.022, verbose=False, over_tol=0.015,
+                     carry_speed=0.015):
+        """Carry the held block above `target` and release it onto its top face.
+
+        Release height is `top + clear_h + edge/2` for the EE (= carried block
+        centre).  clear_h is not 0 on purpose: the blocks are gripped near their
+        bottom edge, so the finger pads sit at/below the part's bottom face and
+        would hit the block underneath before the carried cube lands (measured
+        t10 s1000: release at 10 mm left the cube leaning on the edge, dz 20 mm).
+        Dropping the last ~22 mm onto a flat top face costs ~1 mm of xy accuracy.
+        """
+        held = getattr(self, "_held", None)
+        if not held:
+            raise RuntimeError("place_on_top() called with no block grasped")
+        carried, R_grasp = held["bolt"], held["R_grasp"]
+        edge = BLOCK["edge"]
+        log = []
+
+        top = self.block_top(target)
+        ee_release = np.array([top[0], top[1], top[2] + clear_h + edge / 2.0])
+        ee_above = np.array([top[0], top[1], top[2] + edge / 2.0 + 0.020])
+
+        # 1) Transit height comes from the *stack*, not the table: for the third
+        #    block of a tower the target top is already 0.98 m, and a fixed
+        #    table+0.32 m transit (1.22 m) is unreachable there.
+        ee = self.ee()[0]
+        hi = max(float(ee[2]), top[2] + edge / 2.0 + 0.060)
+        # Stacking on a block that already stands on something else needs the
+        # bent-arm pose FIRST: a climb to the (high) transit height pins joint 4
+        # on its lower limit, and from there the arm never recovers (measured
+        # t0 s1000/s1001: every later route kept the same 115-135 mm error).
+        high_target = top[2] > self.table_z + 0.06
+        if not high_target:
+            err = self.move_to(np.array([ee[0], ee[1], hi]), R_grasp, grip=1.0,
+                               max_steps=150, speed=carry_speed, tol_p=0.05,
+                               stall_patience=30)
+            log.append(("climb", err))
+
+        # 2) lateral traverse. A direct diagonal leg can pin joint 4 on its lower
+        #    limit (q4 = -0.07 rad) while the arm is high and carrying: measured on
+        #    t0 seed 1000, the EE froze 134 mm short of the stack and the placement
+        #    was lost. Dropping to a bent-arm pose near the robot base first frees
+        #    the elbow (same trick as the bin transfers); measured recovery 19.7 mm.
+        routes = {
+            # Re-centring: the pose the arm holds right after reset is the one the
+            # OSC reproduces most reliably. Measured on the reach probe: from there
+            # every stack target was reachable to <10 mm; from a pick pose far to
+            # one side the same target stalls 110-140 mm short (j4 limit).
+            "home_center": [(np.array([self.home_pos[0], self.home_pos[1],
+                                       max(hi, self.table_z + 0.20)]), 200)],
+            "direct": [],
+            "bent_arm": [(np.array([0.05, 0.05, self.table_z + 0.10]), 160)],
+            "bent_arm_mirror": [(np.array([-0.05, 0.05, self.table_z + 0.10]), 160)],
+        }
+        # Order matters: once joint 4 has been driven onto its limit the arm does
+        # not recover (measured: every later route kept the same 114-135 mm error),
+        # so the safe route always runs first.
+        order = ["home_center", "bent_arm", "bent_arm_mirror", "direct"]
+        err, chosen = (1e9, 0.0), None
+        for name in order:
+            for wp, msteps in routes[name]:
+                self.move_to(wp, R_grasp, grip=1.0, max_steps=msteps, speed=0.020,
+                             tol_p=0.050, stall_patience=30)
+            err = self.move_to(np.array([top[0], top[1], hi]), R_grasp, grip=1.0,
+                               max_steps=250, speed=carry_speed, tol_p=0.025,
+                               stall_patience=40)
+            dxy = float(np.linalg.norm(self.ee()[0][:2] - top[:2]))
+            log.append((f"lateral:{name}", err))
+            if chosen is None:
+                chosen = name
+            if dxy <= 0.030:
+                chosen = name
+                break
+        if verbose:
+            print(f"   [stack] lateral route={chosen} err={err[0]:.4f}")
+
+        # 3) descend slowly onto the stack (a fast descent shakes the part loose)
+        err = self.move_to(ee_above, R_grasp, grip=1.0, max_steps=120,
+                           speed=0.012, tol_p=over_tol, stall_patience=30)
+        err = self.move_to(ee_release, R_grasp, grip=1.0, max_steps=150,
+                           speed=0.008, tol_p=0.006, stall_patience=40)
+        log.append(("descend", err))
+
+        # 4) release, retreat straight up, let the cube settle onto the stack
+        self.set_gripper(-1.0, steps=25)
+        self.move_to(ee_above, R_grasp, grip=-1.0, max_steps=120, speed=0.015,
+                     stall_patience=30)
+        for _ in range(40):
+            self.env.step(np.array([0, 0, 0, 0, 0, 0, -1.0], dtype=np.float32))
+
+        ok = self._stack_ok(carried, target)
+        self._held = None
+        return ok, log
+
+    def _stack_ok(self, carried, target, dxy_tol=0.020, dz_tol=0.012):
+        """Is `carried` now resting on `target`? (local check, not the goal)
+
+        xy within 20 mm and one block height above the base; well inside the
+        native `On` predicate's 30 mm / contact criterion, so a True here means
+        the simulator's own goal check should agree.
+        """
+        try:
+            c = self.body_pos(carried)
+            t = self.body_pos(target)
+        except (KeyError, ValueError):
+            return bool(self.u._check_success())
+        dxy = float(np.linalg.norm(np.asarray(c[:2]) - np.asarray(t[:2])))
+        dz = float(c[2] - t[2])
+        return bool(dxy <= dxy_tol and abs(dz - BLOCK["edge"]) <= dz_tol)
 
     def _local_placement_ok(self, bolt, box) -> bool:
         """Did *this* part land in *this* bin?

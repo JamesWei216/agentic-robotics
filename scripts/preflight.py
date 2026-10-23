@@ -66,7 +66,8 @@ def main():
     def suites():
         from libero.libero import get_libero_path
         base = pathlib.Path(get_libero_path("bddl_files"))
-        wanted = {"libero_bolt": 11, "libero_bolt_v2": 11, "libero_bolt_multi": 11}
+        wanted = {"libero_bolt": 11, "libero_bolt_v2": 11, "libero_bolt_multi": 11,
+                  "libero_wood_stack": 11}
         got = {}
         for name, n in wanted.items():
             files = sorted((base / name).glob("*.bddl"))
@@ -79,11 +80,10 @@ def main():
     def registry():
         from libero.libero.benchmark import get_benchmark_dict
         d = get_benchmark_dict()
-        missing = [s for s in ("libero_bolt", "libero_bolt_v2", "libero_bolt_multi")
-                   if s not in d]
-        assert not missing, f"not registered: {missing} (run bolt-sorting/install.py)"
-        return ", ".join(f"{s}:{len(d[s]().tasks)} tasks"
-                         for s in ("libero_bolt", "libero_bolt_v2", "libero_bolt_multi"))
+        names = ("libero_bolt", "libero_bolt_v2", "libero_bolt_multi", "libero_wood_stack")
+        missing = [s for s in names if s not in d]
+        assert not missing, f"not registered: {missing} (run bolt-sorting/install.py + gen_stack_suite.py)"
+        return ", ".join(f"{s}:{len(d[s]().tasks)} tasks" for s in names)
 
     check("benchmark registry", registry)
 
@@ -99,6 +99,15 @@ def main():
         return ", ".join(sorted(hits))
 
     check("bolt assets installed", assets)
+
+    def stack_assets():
+        from libero.libero import get_libero_path
+        a = pathlib.Path(get_libero_path("assets")) / "custom_wood"
+        assert (a / "wood_block" / "wood_block.xml").is_file(), \
+            f"missing wood_block asset under {a} (run vendor/wood-stack/install.py)"
+        return str(a / "wood_block" / "wood_block.xml")
+
+    check("stack assets installed", stack_assets)
 
     def rollout():
         os.environ.setdefault("MUJOCO_GL", "egl")

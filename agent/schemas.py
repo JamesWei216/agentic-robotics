@@ -13,18 +13,29 @@ ALLOWED_OPS = {
     "pick":         {"object": "str"},
     "place":        {"object": "str", "bin": "str"},
     "pick_and_place": {"object": "str", "bin": "str"},
+    # 码垛 (stacking): the second argument is another object, not a container
+    "stack":        {"object": "str", "on": "str"},
+    "pick_and_stack": {"object": "str", "on": "str"},
     "home":         {},
     "check":        {},
     "log":          {"message": "str"},
     "confirm":      {"action": "str"},
 }
 
-# Objects that exist in the libero_bolt workcell.
+# Ops that place an object ON TOP OF another object instead of into a container.
+STACK_OPS = {"stack", "pick_and_stack"}
+
+# Objects that exist in the two workcells.
 SCENE_OBJECTS = {
     "bolt_small_1": {"label": "bolt_small", "target": "parts_bin_blue_1"},
     "bolt_large_1": {"label": "bolt_large", "target": "parts_bin_red_1"},
     "parts_bin_blue_1": {"label": "parts_bin_blue", "target": None},
     "parts_bin_red_1": {"label": "parts_bin_red", "target": None},
+    # libero_wood_stack: cube -> cube, stacking order is enforced by the mission
+    "wood_block_1": {"label": "wood_block", "on": None},
+    "wood_block_2": {"label": "wood_block", "on": "wood_block_1"},
+    "wood_block_3": {"label": "wood_block", "on": "wood_block_2"},
+    "wood_block_4": {"label": "wood_block", "on": "wood_block_3"},
 }
 
 REQUIRED_TOP = ("task", "scene", "steps", "constraints", "risks", "confirmations")
@@ -54,6 +65,18 @@ OP_ALIASES = {
     "go_home": "home", "return_home": "home", "reset": "home",
     "verify": "check", "check_success": "check",
     "print": "log", "confirm_action": "confirm",
+    # stacking aliases (码垛)
+    "stack_up": "pick_and_stack", "pile": "pick_and_stack", "build_tower": "pick_and_stack",
+    "place_on": "stack", "place_on_top": "stack", "put_on": "stack",
+    "stack_block": "stack", "stack_blocks": "pick_and_stack",
+}
+
+# The second stack argument is called `on`; models love to spell it differently and
+# the generic aliases would otherwise turn it into `bin`.
+STACK_ARG_ALIASES = {
+    "target": "on", "onto": "on", "on_top_of": "on", "on_object": "on",
+    "base": "on", "below": "on", "support": "on", "target_object": "on",
+    "bin": "on", "box": "on",
 }
 
 
@@ -65,9 +88,13 @@ def _normalize_step(st: dict) -> dict:
         # some models put the arguments at the top level of the step
         args = {k: v for k, v in st.items() if k not in
                 ("op", "id", "purpose", "why", "on_failure", "description", "args")}
+    stack = st["op"] in STACK_OPS
     norm = {}
     for k, v in args.items():
         key = str(k).strip().lower()
+        if stack and key in STACK_ARG_ALIASES:
+            norm[STACK_ARG_ALIASES[key]] = v
+            continue
         norm[ARG_ALIASES.get(key, key)] = v
     st["args"] = norm
     return st
@@ -119,6 +146,12 @@ def validate_plan(plan: dict) -> dict:
             for o in filter(None, objs):
                 if o not in SCENE_OBJECTS:
                     raise PlanError(f"step {i}: unknown object {o!r}; scene has {sorted(SCENE_OBJECTS)}")
+        if op in STACK_OPS:
+            for o in filter(None, [args.get("object"), args.get("on")]):
+                if o not in SCENE_OBJECTS:
+                    raise PlanError(f"step {i}: unknown object {o!r}; scene has {sorted(SCENE_OBJECTS)}")
+            if args.get("object") == args.get("on"):
+                raise PlanError(f"step {i}: cannot stack {args.get('object')!r} onto itself")
         st["args"] = args
         st.setdefault("id", i + 1)
 

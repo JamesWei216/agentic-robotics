@@ -140,7 +140,8 @@ def main() -> int:
     print("[1/6] planning from", args.taskbook)
     if args.no_llm:
         pres = planner.PlanResult(planner._fallback_plan(
-            pathlib.Path(args.taskbook).read_text()), "fallback", 0, "no-llm")
+            pathlib.Path(args.taskbook).read_text(), CFG["runtime"]["suite"]),
+            "fallback", 0, "no-llm")
     else:
         pres = planner.make_plan(args.taskbook, suite=CFG["runtime"]["suite"], retries=1)
     (run_dir / "plan.json").write_text(json.dumps(pres.plan, ensure_ascii=False, indent=2) + "\n")
