@@ -181,13 +181,17 @@ def figure_scene(path, rows, pct, scale=0.72):
 def main():
     import imageio.v2 as iio
 
-    metrics_v2 = json.loads((ROOT / "runs/20261018-134900_v2_carry/metrics.json").read_text())
-    metrics_multi = json.loads((ROOT / "runs/20261023-212018_multi_recheck_stackwork/metrics.json").read_text())
-    metrics_stack = json.loads((ROOT / "runs/20261023-211446_stack_full/metrics.json").read_text())
-    metrics_vision = json.loads((ROOT / "runs/20261018-135739_vision_regionfix/metrics.json").read_text())
+    # numbers come from the 2026-10-25 batch (same code state as the PDF/PPT)
+    metrics_v2 = json.loads((ROOT / "runs/20261025-215740_main_final/metrics.json").read_text())
+    metrics_multi = json.loads((ROOT / "runs/20261025-220025_multi_final/metrics.json").read_text())
+    metrics_stack = json.loads((ROOT / "runs/20261025-220702_stack_final/metrics.json").read_text())
+    metrics_vision = json.loads((ROOT / "runs/20261025-220618_vision_final/metrics.json").read_text())
 
     def pct_of(m):
         return f"{m['ok']}/{m['n']} = {m['overall'] * 100:.1f}%"
+
+    def p100(m):
+        return f"{m['overall'] * 100:.0f}%"
 
     # total duration for the progress bar
     scenes = [
@@ -200,7 +204,7 @@ def main():
         ("clip", 24, "libero_wood_stack_t10_s1000_ok.mp4", "码垛 · t10 双层双列 4 块"),
         ("clip", 20, "libero_bolt_v2_t2_s1000_vision_ok.mp4", "视觉闭环 · RGB-D 分割 + 反投影"),
         ("shot", 17),
-        ("clip", 24, "libero_bolt_multi_t10_s1000_fail.mp4", "失败案例 · 邻件遮挡下的后续抓取"),
+        ("clip", 26, "libero_bolt_multi_t9_s1000_budget_fail.mp4", "失败案例 · 长程多件的搬运预算"),
         ("repro", 20),
         ("outro", 12),
     ]
@@ -209,16 +213,16 @@ def main():
     rows_main = [
         ("h", "主任务：螺栓按尺寸分拣"),
         ("m", pct_of(metrics_v2)),
-        ("b", "10 个单件任务 × 10 个固定初始状态，全部 10/10"),
-        ("b", "平均 686 步 / 34 秒一回合，0 次超步、0 次 OOM"),
+        ("b", "10 个单件任务 × 10 个固定初始状态，9 个任务 10/10"),
+        ("b", f"平均 {metrics_v2['mean_steps']:.0f} 步 / {metrics_v2['mean_duration_s']:.1f} 秒一回合"),
         ("w", "成功判据：LIBERO 原生 In(bolt, bin) 谓词"),
     ]
     rows_multi = [
         ("h", "变体：批量分拣"),
         ("m", pct_of(metrics_multi)),
-        ("b", "11 任务 × 10 seed，每回合 3–4 件连续分拣"),
-        ("b", "失败集中在“第 2 件及以后”：邻件遮挡 + 残留姿态"),
-        ("w", "已定位到预抓取位姿触关节限位，下一步做分层子目标编排"),
+        ("b", "11 任务 × 10 seed，每回合 2–4 件连续分拣"),
+        ("b", "10-18 是 71.8%：第 2 件总抓不到"),
+        ("w", "根因 A22：放完第 1 件后料盒被指尖挂走 → 释放高度按内腔宽度分档"),
     ]
     rows_stack = [
         ("h", "码垛：木块堆叠（本次新增）"),
@@ -239,13 +243,13 @@ def main():
         ("m", pct_of(metrics_vision)),
         ("b", "RGB-D 分割 + 反投影 + PCA，不用特权位姿"),
         ("b", "盒中心误差 0.4–4.2 mm，螺栓横向 2–7 mm"),
-        ("w", "在线 90%（18/20），离线检出 24/24"),
+        ("w", f"在线 {pct_of(metrics_vision)}，离线检出 24/24"),
     ]
     rows_fail = [
         ("h", "失败案例也交底"),
-        ("b", "变体 t10 s1000：第 2 件起预抓取位姿触关节限位，超步失败"),
-        ("b", "根因写进 docs/failures.md（A6–A21 共 21 例）"),
-        ("w", "自动修复在子集上 97%→100%，但全量复测 98% —— 如实标注，不进主口径"),
+        ("b", "这段：第 2 件抓取后搬运超预算（远端边缘 x≈+0.17）"),
+        ("b", "变体剩余 5 例 = 3 例布局不可行 + 2 例搬运预算"),
+        ("w", "全部写进 docs/failures.md（35 例，含 A22 料盒被拖走）"),
     ]
 
     writer = iio.get_writer(OUT / "AG-VLA-demo-720p.mp4", fps=FPS, codec="libx264",
@@ -265,14 +269,15 @@ def main():
             frames = [card_title(
                 [("AG-VLA 智能机械臂", "title", FG),
                  ("Agent 驱动的机械臂应用开发与评测流水线", "sub", ACCENT),
-                 ("分拣 100% · 变体 72.7% · 码垛 100% · 视觉闭环 90%", "body", FG)],
+                 (f"分拣 {p100(metrics_v2)} · 变体 {p100(metrics_multi)} · 码垛 {p100(metrics_stack)}"
+                  f" · 视觉闭环 {p100(metrics_vision)}", "body", FG)],
                 "2026 年 Agentic Robotics 赛题 · 参赛作品", pct_label()) for _ in range(n)]
         elif kind == "overview":
             frames = [bullets_card("三个可复现的交付口径", [
-                ("主任务：螺栓按尺寸分拣入对应颜色料盒 —— 100%（100/100）", FG),
-                ("变体：同工位 4 件批量分拣 —— 72.7%（80/110）", FG),
-                ("码垛：木块按约定垛型建塔 —— 100%（110/110）", ACCENT2),
-                ("加分 b 视觉闭环 90% ／ 加分 d 人确认 + 急停已演示", FG),
+                (f"主任务：螺栓按尺寸分拣入对应颜色料盒 —— {pct_of(metrics_v2)}", FG),
+                (f"变体：同工位多件批量分拣 —— {pct_of(metrics_multi)}（10-18 是 71.8%）", ACCENT2),
+                (f"码垛：木块按约定垛型建塔 —— {pct_of(metrics_stack)}", ACCENT2),
+                (f"加分 b 视觉闭环 {pct_of(metrics_vision)} ／ 加分 d 人确认 + 急停已演示", FG),
             ], pct_label(),
                 note="全部数字来自固定 seed 的公开初始状态，无隐藏测试集、无人工挑选样例") for _ in range(n)]
         elif kind == "arch":
@@ -288,12 +293,12 @@ def main():
                 ("h", "加分 d：人机确认 + 急停"),
                 ("b", "抓取 / 释放 / 首次运动 / 长距离移动 四道门控"),
                 ("b", "网页面板实时批准，决定写 runtime/audit.jsonl"),
-                ("w", "manual 模式已演示：3 次批准、1 次急停"),
+                ("w", "manual 模式已演示：网页面板批准 + 急停，全部落审计"),
             ], pct_label(), scale=0.52) for _ in range(n)]
         elif kind == "repro":
             frames = [bullets_card("复现：三条命令 + 自检", [
                 "bash scripts/bootstrap_env.sh  → 装依赖、装资产、生成四套任务与固定初始状态",
-                "python scripts/preflight.py  → 8 项自检全绿（含码垛资产与套件注册）",
+                "python scripts/preflight.py  → 7 项自检全绿（含码垛资产与套件注册）",
                 "./run.sh --suite <套件> --taskbook <任务书> --seeds 10  → 复跑本视频里的数字",
                 ("代码与运行日志：github.com/<你的GitHub用户名>/agentic-robotics", ACCENT2),
             ], pct_label(), note="干净环境（新建 conda + requirements 从零装）已验证 preflight 全绿") for _ in range(n)]
@@ -302,7 +307,7 @@ def main():
                 [("谢谢", "title", FG),
                  ("AG-VLA 智能机械臂 · <已按赛题要求隐去>", "body", ACCENT),
                  ("队长：魏凤辰", "body", DIM)],
-                "2026-10-23", pct_label()) for _ in range(n)]
+                "2026-10-25", pct_label()) for _ in range(n)]
         else:  # clip scenes
             clip_name = scene[2]
             tag = scene[3]
