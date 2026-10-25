@@ -321,10 +321,11 @@ class Robot:
         self.safety.guard_point(grasp_point, label=f"grasp:{object}")
         self.gate.require("grasp_close", {"object": object})
         try:
+            dbg = os.environ.get("AGENT_DEBUG_GRASP") == "1"
             if self._is_block(object):
-                ok, _log = self.ex.grasp_block(object)
+                ok, _log = self.ex.grasp_block(object, verbose=dbg)
             else:
-                ok, _log = self.ex.grasp(object)
+                ok, _log = self.ex.grasp(object, verbose=dbg)
         except EpisodeDone:
             self.emit("pick", object=object, grasped=None, note="episode_terminated")
             return True

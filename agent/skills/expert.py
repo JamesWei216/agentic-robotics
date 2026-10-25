@@ -13,6 +13,7 @@ import re
 import sys
 
 import numpy as np
+import os
 
 sys.path.insert(0, "/home/wei/work/g05/LIBERO-master")
 import robosuite.utils.transform_utils as T  # noqa: E402
@@ -137,6 +138,61 @@ class Expert:
         for _ in range(steps):
             self.step(np.zeros(3), np.zeros(3), cmd)
 
+    def _descend_slow(self, target, R, grip=-1.0, tol_p=0.006, speed=0.012):
+        """Descend onto a part in short legs at a low commanded speed.
+
+        A single fast descend leg (speed 0.030, 80 steps) is what makes the
+        *second* part of a batch fail: measured on libero_bolt_multi t5 s1000
+        (`scripts/probe_stall.py`), the OSC overshoots and parks in a flat limit
+        cycle **12-13 mm above the shank**, then the jaws close on air. The same
+        pose approached in 60/30/10 mm legs at 0.012 m/step converges to 3-4 mm.
+        Cheap in steps (3 legs instead of one 80-step leg) and it never closes
+        the jaws while still high above the part.
+        """
+        err_p, err_o = 1e9, 1e9
+        dbg = os.environ.get("AGENT_DEBUG_GRASP") == "1"
+        for off in (0.060, 0.030, 0.0):
+            leg = np.array([target[0], target[1], target[2] + off])
+            if self.ee()[0][2] <= leg[2] + 0.003:
+                continue
+            err_p, err_o = self.move_to(leg, R, grip=grip, tol_p=tol_p,
+                                        max_steps=45, speed=speed)
+            if dbg:
+                bins = {}
+                for b in ("parts_bin_blue_1", "parts_bin_red_1"):
+                    try:
+                        bins[b] = np.round(self.body_pos(b), 3).tolist()
+                    except Exception:
+                        pass
+                print(f"   [descend] off={off:.3f} leg_z={leg[2]:.3f} "
+                      f"ee={np.round(self.ee()[0], 4)} err={float(err_p)*1000:.1f}mm "
+                      f"j={[self._j(i) for i in range(1,8)]} c={self._finger_contacts()} "
+                      f"bins={bins}", flush=True)
+        return err_p, err_o
+
+    def _j(self, i):
+        try:
+            return round(float(self.u.sim.data.get_joint_qpos(f"robot0_joint{i}")), 2)
+        except Exception:
+            return None
+
+    def _finger_contacts(self):
+        """Geoms of the hand touching anything (debug aid)."""
+        sim = self.u.sim
+        out = []
+        for c in sim.data.contact[:sim.data.ncon]:
+            n1 = sim.model.geom_id2name(c.geom1) or f"geom{c.geom1}"
+            n2 = sim.model.geom_id2name(c.geom2) or f"geom{c.geom2}"
+            b1 = sim.model.body_id2name(sim.model.geom_bodyid[c.geom1]) or ""
+            b2 = sim.model.body_id2name(sim.model.geom_bodyid[c.geom2]) or ""
+            rb1 = ("robot0" in b1 or "gripper0" in b1)
+            rb2 = ("robot0" in b2 or "gripper0" in b2)
+            if rb1 != rb2:
+                tag = f"{n1 if rb1 else n2}->{n2 if rb1 else n1}"
+                if tag not in out:
+                    out.append(tag)
+        return out[:6]
+
     # ------------------------------------------------------------- kinematics
     def grasp_orientation(self, axis_dir, R_cur=None):
         """EE orientation for a top-down grasp of a bolt lying along `axis_dir`.
@@ -186,8 +242,8 @@ class Expert:
         off = np.array([-sp["T"] / 2 + sp["H_h"] / 2, 0.0, sp["AF"] / 2])
         return self.body_pos(name) + R @ off
 
-    def grasp_point(self, name):
-        """Grasp the *shank* 25% along it from the head shoulder.
+    def grasp_point(self, name, frac=0.30):
+        """Grasp the *shank* `frac` along it from the head shoulder.
 
         Pinching the lying hex head with vertical jaw faces is unstable (the
         head is only H_h thick along the jaw's lateral axis and slips out);
@@ -319,6 +375,10 @@ class Expert:
             self.set_gripper(-1.0, steps=12)
 
             tgt = head + np.array([0, 0, pre_h])
+            # tol 20 mm + stall patience: the OSC keeps a 12-25 mm steady-state
+            # error here, so a 10 mm tolerance burns the full 100-step budget on
+            # every approach (t6 s1006: the pick alone ate 687 of the 1200-step
+            # horizon and the transit then had nothing left).
             err = self.move_to(tgt, R_grasp, grip=-1.0)
             if err[0] > 0.02:
                 # Coming from the far side of the table (e.g. right after placing
@@ -331,7 +391,17 @@ class Expert:
             log.append((f"pre_grasp{attempt}", err)); _tr(verbose, "pre_grasp", self, bolt)
 
             tgt = head + np.array([0, 0, grasp_dz])
-            err = self.move_to(tgt, R_grasp, grip=-1.0, tol_p=0.006, max_steps=80)
+            if os.environ.get("AGENT_SLOW_DESCEND", "0") == "1":
+                err = self._descend_slow(tgt, R_grasp, grip=-1.0)
+                if err[0] > 0.010:
+                    # still high above the part: climb back out and re-approach
+                    # instead of closing the jaws on air (old behaviour)
+                    self.move_to(np.array([tgt[0], tgt[1],
+                                           max(self.table_z + 0.30, tgt[2] + 0.12)]),
+                                 R_grasp, grip=-1.0, max_steps=120)
+                    err = self._descend_slow(tgt, R_grasp, grip=-1.0, speed=0.009)
+            else:
+                err = self.move_to(tgt, R_grasp, grip=-1.0, tol_p=0.006, max_steps=80)
             log.append((f"descend{attempt}", err)); _tr(verbose, "descend", self, bolt)
 
             for _ in range(grip_close_steps):
@@ -356,10 +426,18 @@ class Expert:
                       f"held={held}")
             if held:
                 break
-            # not held: open, drop back to the settled pose, try once more
+            # not held: open, climb clear, and try once more from the *other*
+            # jaw side and a slightly different point along the shank
             self.set_gripper(-1.0, steps=10)
-            self.move_to(head + np.array([0, 0, pre_h]), R_grasp, grip=-1.0,
-                         max_steps=80)
+            self.move_to(np.array([head[0], head[1], max(self.table_z + 0.30,
+                                                          head[2] + pre_h + 0.10)]),
+                         R_grasp, grip=-1.0, max_steps=120)
+            if attempt < attempts:
+                head = self.grasp_point(bolt, frac=0.45)
+                flip = self.grasp_orientation(axis, R_cur=None)
+                R_grasp = flip if not np.allclose(flip, R_grasp) else R_grasp
+                self.move_to(head + np.array([0, 0, pre_h]), R_grasp, grip=-1.0,
+                             max_steps=80)
 
         self._held = dict(bolt=bolt, head=head, R_grasp=R_grasp, lift_h=lift_h)
         return held, log
@@ -632,6 +710,13 @@ class Expert:
         ee_xy = self.ee()[0][:2].copy()
         bin_xy = np.asarray(box_pos[:2], dtype=float)
         hi_z = max(head[2] + lift_h, self.table_z + 0.30)
+        # The high-arc transit climbs above hi_z. For a small part picked near the
+        # table that used to be table_z+0.30+0.14 = 1.34 m, i.e. *outside* the
+        # arm's 1.30 m ceiling: the climb leg could not converge, burned its whole
+        # step budget, and the second transfer of a batch ran out of horizon (t5
+        # s1000: 1224 steps spent between the 2nd pick and the release). Cap it.
+        arc_z = min(hi_z + float(os.environ.get("AGENT_ARC_EXTRA", "0.14")),
+                    self.table_z + float(os.environ.get("AGENT_ARC_MAX", "0.34")))
         mid_z = max(head[2] + lift_h, self.table_z + 0.22)
         carry_z = head[2] + lift_h
 
@@ -652,9 +737,9 @@ class Expert:
             # happens where the arm is least extended. Probed on the two seeds
             # that used to time out (v2 t6 s1001/s1003): every leg converges.
             "high_arc": [
-                (np.array([ee_xy[0], ee_xy[1], hi_z + 0.14]), 120),
-                (np.array([bin_xy[0] * 0.5, bin_xy[1] * 0.5, hi_z + 0.14]), 150),
-                (np.array([bin_xy[0], bin_xy[1], hi_z + 0.14]), 180),
+                (np.array([ee_xy[0], ee_xy[1], arc_z]), 120),
+                (np.array([bin_xy[0] * 0.5, bin_xy[1] * 0.5, arc_z]), 150),
+                (np.array([bin_xy[0], bin_xy[1], arc_z]), 180),
                 (np.array([bin_xy[0], bin_xy[1], carry_z]), 200),
             ],
             # the old single-leg route, which is the fastest when it works
@@ -690,6 +775,16 @@ class Expert:
         # release up to ~60 mm off centre still drops the part inside. The old
         # code allowed that implicitly and scored 98%; requiring convergence first
         # made some reach-edge seeds burn the whole step budget instead.
+        # Unbend first: a part picked at the far edge leaves the arm near full
+        # extension, and every following leg then saturates (t6 seeds 1004/1006 on
+        # the 10-22 regenerated init states: the bolt sits at x=+0.174 and the
+        # whole transit stalls, 1200 steps gone). Pulling the EE back toward the
+        # base at carry height first keeps the elbow bent.
+        unbend = os.environ.get("AGENT_UNBEND", "1") == "1"
+        if unbend and float(np.hypot(*ee_xy)) > float(os.environ.get("AGENT_UNBEND_TH", "0.10")):
+            f = float(os.environ.get("AGENT_UNBEND_F", "0.20"))
+            goto(np.array([ee_xy[0] * f, ee_xy[1] * f, carry_z]), 120, tol=0.05)
+            log.append(("unbend", 0.0))
         REACH_ENOUGH = 0.060
         best_dxy, chosen, err = 1e9, None, 1e9
         for name, legs in routes.items():
@@ -721,21 +816,71 @@ class Expert:
         # table_z+0.05, which for the 45 mm blue bin is *below its rim* and for
         # the 65 mm red bin 25 mm inside it: the pads ended up straddling a wall
         # and the part bounced out. Keep the release inside the cavity but low.
-        tgt_p = np.array([box_pos[0], box_pos[1],
-                          max(cavity_floor + min(release_h, 0.012),
-                              self.table_z + 0.015)])
+        # Release height. A4 fixed the "release inside the wall" bug by dropping
+        # low (cavity_floor + 12 mm), but that puts the *fingers* below the rim:
+        # opening the jaws there and lifting hooks the bin -- measured on
+        # libero_bolt_multi t5 s1000, the 130 mm blue bin was dragged up 98 mm and
+        # then followed the arm across the table onto the *second* part, which is
+        # what made the second grasp fail with "jaws closed on nothing" and no
+        # contact on the part itself. So release just above the rim instead, and
+        # open/lift slowly; the part still falls well inside a 114/172 mm cavity.
+        rim = box_pos[2] + box_size[2]
+        z_drop = os.environ.get("AGENT_RELEASE_Z")
+        # Narrow bins (blue: cavity half-width 57 mm vs a ~50 mm jaw sweep) leave no
+        # room for the fingers below the rim: releasing low hooks the bin and drags
+        # it across the table onto the *next* part. Wide bins (red: 86 mm) have
+        # plenty of room, so keep the low release there -- a 103 mm bolt dropped
+        # from rim+35 mm bounces out (measured: main suite t6 100% -> 80% with a
+        # uniformly high release).
+        half = min(float(box_size[0]), float(box_size[1]))
+        narrow = (half - 0.050) < 0.025
+        if z_drop == "low" or (z_drop != "high" and not narrow):
+            rel_z = max(cavity_floor + min(release_h, 0.012), self.table_z + 0.015)
+        else:
+            rel_z = max(rim + 0.035, self.table_z + 0.060)
+        try:
+            bin_z0 = float(self.body_pos(box)[2])
+        except Exception:          # vision mode: the bin may be out of view
+            bin_z0 = float(box_pos[2])
+        tgt_p = np.array([box_pos[0], box_pos[1], rel_z])
         err = self.move_to(tgt_p, R_grasp, grip=1.0, tol_p=into_tol, max_steps=200,
                            speed=carry_speed, stall_patience=40)
         log.append(("into_bin", err)); _tr(verbose, "into_bin", self, bolt)
+        dbg = os.environ.get("AGENT_DEBUG_GRASP") == "1"
+        if dbg:
+            print(f"   [into_bin] ee={np.round(self.ee()[0], 4)} "
+                  f"bolt={np.round(self.body_pos(bolt), 4)} "
+                  f"bin={np.round(self.body_pos(box), 4)} "
+                  f"c={self._finger_contacts()}", flush=True)
         self.set_gripper(-1.0, steps=20)
 
+        # lift straight up slowly first: a fast lift with open jaws is what drags
+        # a bin that the finger tips are still touching
+        self.move_to(np.array([box_pos[0], box_pos[1], rel_z + 0.060]), R_grasp,
+                     grip=-1.0, max_steps=45, speed=0.010, stall_patience=20)
         tgt_p = np.array([box_pos[0], box_pos[1], carry_z])
         self.move_to(tgt_p, R_grasp, grip=-1.0, max_steps=60, stall_patience=25)
+        if dbg:
+            print(f"   [released] ee={np.round(self.ee()[0], 4)} "
+                  f"bolt={np.round(self.body_pos(bolt), 4)} "
+                  f"bin={np.round(self.body_pos(box), 4)} "
+                  f"c={self._finger_contacts()}", flush=True)
 
         for _ in range(25):
             self.env.step(np.array([0, 0, 0, 0, 0, 0, -1.0], dtype=np.float32))
+        if dbg:
+            print(f"   [settled ] bolt={np.round(self.body_pos(bolt), 4)} "
+                  f"bin={np.round(self.body_pos(box), 4)}", flush=True)
 
         ok = self._local_placement_ok(bolt, box)
+        try:
+            dz = abs(float(box_pos[2]) - bin_z0)
+        except Exception:
+            dz = 0.0
+        if dz > 0.006:
+            log.append(("bin_disturbed", dz))
+            if verbose:
+                print(f"   [transfer] bin lifted {dz*1000:.0f}mm during release")
         self._held = None
         return ok, log
 

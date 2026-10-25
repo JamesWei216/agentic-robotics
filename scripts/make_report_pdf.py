@@ -40,10 +40,10 @@ def _per_task(d):
             for k, v in sorted(d["per_task"].items(), key=lambda kv: int(kv[0]))]
 
 
-MAIN_M = _latest(os.environ.get("MAIN_RUN", "20261018-134900_v2_carry"))
-VAR_M = _latest(os.environ.get("VAR_RUN", "20261018-134855_multi_carry"))
-VIS_M = _latest(os.environ.get("VIS_RUN", "20261018-135739_vision_regionfix"))
-STACK_M = _latest(os.environ.get("STACK_RUN", "20261023-211446_stack_full"))
+MAIN_M = _latest(os.environ.get("MAIN_RUN", "20261025-215740_main_final"))
+VAR_M = _latest(os.environ.get("VAR_RUN", "20261025-220025_multi_final"))
+VIS_M = _latest(os.environ.get("VIS_RUN", "20261025-220618_vision_final"))
+STACK_M = _latest(os.environ.get("STACK_RUN", "20261025-220702_stack_final"))
 REPAIR_M = _latest(os.environ.get("REPAIR_RUN", "20261018-104215_v2_final2"))
 
 # 参赛信息 + 视频链接（提交包构建时由 make_submission.sh 通过环境变量注入）
@@ -148,6 +148,11 @@ VAR_X_MED = statistics.median(VARF["xs"]) if VARF["xs"] else 0.0
 VAR_X_MAX = max(VARF["xs"]) if VARF["xs"] else 0.0
 VAR_X_MIN = min(VARF["xs"]) if VARF["xs"] else 0.0
 VAR_X_RIGHT = sum(1 for v in VARF["xs"] if v > 0.09)
+VAR_COMPOSITION = (
+    (f"<b>{VAR_GRASP_N} 例：抓取失败</b>（`jaws closed on nothing`；其中 {VAR_BOTH_N} 例同时伴随 1 次放置失败）；"
+     if VAR_GRASP_N else "0 例抓取失败；")
+    + f"{VAR_CRASH_N} 例：初始布局不可行（<code>RandomizationError</code>）；"
+    + f"{VAR_FAIL_N - VAR_CRASH_N - VAR_GRASP_N} 例：搬运预算（A24）")
 VAR_FAIL_PER_TASK = "；".join(
     f"t{t.replace('t', '')} <b>{n - o}/{n}</b>"
     for t, o, n, _s in VARIANT["per_task"] if n - o > 0)
@@ -172,7 +177,7 @@ def _fail_trace(run_id: str, ep: str, limit: int = 13):
             body = " ".join(f"{k}={v}" for k, v in fields.items())
             if len(body) > 92:
                 body = body[:89] + "..."
-            rows.append(f"{e.get('steps', 0):>5}  {ev:<11}{body}")
+            rows.append(f"{e.get('steps', 0):>5}  {ev:<12} {body}")
         elif ev == "log":
             msg = str(e.get("message", ""))
             if "grasped" in msg or "grasp failed" in msg or "retry failed" in msg or "goal predicate" in msg:
@@ -180,7 +185,52 @@ def _fail_trace(run_id: str, ep: str, limit: int = 13):
     return "\n".join(rows[:limit])
 
 
-FAIL_TRACE = _fail_trace(VARIANT["run"], "t5_s1000")
+def _first_fail_ep(run_id: str):
+    """First failing episode that still has a result.json (a usable replay)."""
+    base = ROOT / "runs" / run_id / "verify"
+    for d in sorted(base.glob("*")):
+        res = d / "result.json"
+        if res.exists() and not json.loads(res.read_text()).get("success"):
+            return d.name
+    return "t5_s1000"
+
+
+def _episode_budget(run_id: str, ep: str):
+    """(pick_steps, place_steps, horizon) for the replay narrative."""
+    p = ROOT / "runs" / run_id / "verify" / ep
+    trace = p / "trace.jsonl"
+    pick = place = None
+    if trace.exists():
+        for line in trace.read_text().splitlines():
+            e = json.loads(line)
+            if e.get("event") == "pick" and pick is None:
+                pick = e.get("steps")
+            if e.get("event") == "place":
+                place = e.get("steps")
+    task_idx = int(ep.split("_")[0].lstrip("t"))
+    try:
+        n_items = len(json.loads((ROOT / "config" / "missions.json").read_text())
+                       [suite_of(run_id)][str(task_idx)])
+    except Exception:
+        n_items = 1
+    return pick or 0, (place or 0), 400 + 800 * max(1, n_items)
+
+
+def suite_of(run_id: str):
+    for suite in ("libero_bolt_multi", "libero_bolt_v2", "libero_wood_stack"):
+        if (ROOT / "runs" / run_id / "manifest.json").exists():
+            try:
+                if json.loads((ROOT / "runs" / run_id / "manifest.json").read_text()).get("suite") == suite:
+                    return suite
+            except Exception:
+                pass
+    return "libero_bolt_multi"
+
+
+FAIL_EP = _first_fail_ep(VARIANT["run"])
+FAIL_TRACE = _fail_trace(VARIANT["run"], FAIL_EP)
+FAIL_PICK_STEPS, FAIL_PLACE_STEPS, HORIZON = _episode_budget(VARIANT["run"], FAIL_EP)
+FAIL_TRANSIT_STEPS = max(0, FAIL_PLACE_STEPS - FAIL_PICK_STEPS)
 
 
 def _fail_check_step(run_id: str, ep: str):
@@ -354,6 +404,9 @@ FAIL_INDEX = [
     ("C2", "参数名漂移：box/target/obj", "schema 别名归一化 + 报错回显收到的参数名"),
     ("C3", "生成代码凭空猜返回结构（dict 被解包）", "能力卡改精确签名 + 对象名白名单校验"),
     ("C4", "修好一个报错引入另一个", "这本身是证据：修复循环配对子集复测、只采纳有提升的版本"),
+    ("A22", "放完第 1 件后料盒被“粘走”，第 2 件抓取撞在料盒上", "低释放让指尖低于盒口、张爪挂住内壁 → 窄盒改盒口+35 mm 释放 + 慢速直上（变体 71.8% → 95.5%）"),
+    ("A23", "统一抬高释放点后大螺栓从红盒弹出", "释放高度按内腔宽度分档：窄盒高释放、宽盒低释放"),
+    ("A24", "高空弧线爬升段超出机械臂 1.30 m 上限", "arc_z = min(hi_z+0.14, table+0.34)；远端抓取后先回内圈再横移"),
     ("D1", "长程多件第 2 件仍未根除（未解决）", "下一版：分层子目标编排（每件独立预算 + 回安全位）"),
     ("D2", "感知：特权位姿 vs 视觉闭环（未解决）", "两条路径都实现并分别评测，报告如实标注主口径用特权位姿"),
     ("D3", "长程任务步数预算有时不够重试（未解决）", "预算写进 docs/protocol.md，不许为提高成功率事后放宽"),
@@ -404,7 +457,7 @@ HTML = f"""<!DOCTYPE html>
 <h1>Agentic Robotics 赛题 · 总结报告</h1>
 <div class="sub">作品：<b>{WORK}</b> · 单位：{ORG} · 队长：{LEADER}<br>
 赛题：Agent 驱动的机械臂应用开发与评测流水线 · 主任务=分拣，变体=批量分拣，加分 b=视觉闭环，加分 c=码垛<br>
-平台：LIBERO / MuJoCo · Franka Panda 单臂 + 平行二指夹爪 · 纯仿真 · 报告版本 v2（2026-10-25，新增失败案例章与评测声明）</div>
+平台：LIBERO / MuJoCo · Franka Panda 单臂 + 平行二指夹爪 · 纯仿真 · 报告版本 v3（2026-10-25 深夜：变体套件修复后全量复测，71.8% → 95.5%；新增失败案例章与评测声明）</div>
 
 <div class="kpi">
   <div><b>{MAIN['overall']}</b><span>主任务成功率<br>{MAIN['ok']}/{MAIN['n']} episodes</span></div>
@@ -451,11 +504,15 @@ HTML = f"""<!DOCTYPE html>
 <tr><td class="left">通过 / 总数</td>{"".join(f"<td class='{'good' if o == n else 'warn'}'>{o}/{n}</td>" for _t, o, n, _s in MAIN['per_task'])}</tr>
 <tr><td class="left">平均步数</td>{"".join(f"<td>{s:.0f}</td>" for _t, _o, _n, s in MAIN['per_task'])}</tr>
 </table>
-<p>历史上唯一的失分点是 t6（大螺栓→红盒，红盒落点靠近可达域边缘、搬运阶段超步，A6），修复后本轮 100 条 episode 全部通过。
-逐条失败记录与归类见第四章（主任务本轮失败数为 0）。</p>
+<p><b>口径说明（重要）</b>：10-18 归档的 100% 是在<b>当时那批初始状态</b>上测的。10-22 做“干净环境复现”时按
+<code>bootstrap_env.sh</code> 重装了 LIBERO 并<b>重采了初始状态</b>（A14/A15 修的就是那次暴露的坑），因此
+<code>seed 1004/1006</code> 现在对应另一批布局。在当前这套初始状态上，<b>HEAD（改动前）代码的 t6 也只有 8/10</b>
+（实测：<code>--tasks 6 --seeds 10</code> → 80%），所以本轮的 {MAIN['overall']} 是<b>当前基线</b>，不是本轮改动造成的回退。
+两个失败 seed 的螺栓都落在 x ≈ +0.174 m —— 已越过 A17 量出的“舒适带”（右侧 x &gt; +0.10 抓取后关节饱和），
+表现为抓取成功后搬运阶段烧完 1200 步预算。逐条失败记录与归类见第四章。</p>
 
 <img src="reports/figures/convergence.png" style="width:100%;margin:4px 0 6px">
-<h3>本轮（10-18）的关键工程修复 · 一天从 98% 到 100%</h3>
+<h3>10-18 那天的收敛过程（历史，作为“同一任务书逐步修 bug”的证据）</h3>
 <table class="keep">
 <tr><th style="width:26%">阶段</th><th style="width:14%">主任务</th><th class="left">改动</th></tr>
 <tr><td class="left">10-17 深夜基线</td><td>98.0%</td><td class="left">—</td></tr>
@@ -468,14 +525,15 @@ HTML = f"""<!DOCTYPE html>
 改为 <b>高弧线路线</b>（先升到携带高度 +0.14 m，再经二分点横向跨越）+ <code>stall_patience</code> 失速早退。</li>
 <li><b>判据分离</b>：把“控制是否收敛”和“任务是否可达”分开判 —— 料盒内腔 172 mm，释放点偏 60 mm 仍能落进去，
 所以路线选择不再要求毫米级收敛（曾因要求收敛把 98% 打到 92%）。</li>
-<li><b>结果</b>：t6 由 80% → 100%，平均步数 678 → {MAIN['steps']:.0f}，总成功率 98% → {MAIN['overall']}（无自动修复口径）。</li>
+<li><b>结果</b>：t6 由 80% → 100%（<u>在 10-18 那批初始状态上</u>），平均步数 678 → {MAIN['steps']:.0f}；换到 10-22 重采的初始状态后，同一套代码在 t6 上是 8/10 —— 两批布局不同，见上面的口径说明。</li>
 </ul>
 
 <h2>三、变体任务（libero_bolt_multi）</h2>
 <p>同一任务书、同一套流水线。变体套件每类 2 件（t0–t9）+ 一件 4 件全分拣（t10），共 11 任务 × 10 seed：
-<b>{VARIANT['overall']}（{VARIANT['ok']}/{VARIANT['n']}）</b>。10-18 在这一项上做了多轮（区域半长 A13、释放后 home A9、区域可行化 D4），
-成功率从 58.2% 提到 {VARIANT['overall']}，根因见 A13（区域半长小于物体半径 → 料盒被散布到可达域外）与小螺栓搬运滑脱。
-大螺栓类任务（t0/t2/t4/t6）已<b>40/40 全清</b>，短板集中在“小螺栓→蓝盒”与 4 件任务。</p>
+<b>{VARIANT['overall']}（{VARIANT['ok']}/{VARIANT['n']}）</b>。10-18 先做到 71.8%（区域半长 A13、释放后 home A9、区域可行化 D4），
+10-25 的一轮定位又把这一项推到 <b>{VARIANT['overall']}</b>：真正的主因是 <b>A22 —— 第 1 件放完后料盒被张开的指头“挂”住、
+拖到了第 2 件的位置</b>，第 2 件其实是撞在料盒上（详见 4.3）。
+大螺栓类任务（t0/t2/t4/t6）仍<b>40/40 全清</b>；小螺栓类 t1/t3/t5/t9 <b>38/40</b>（10-18 是 17/40；本轮 t1/t3/t5 全部 10/10）；4 件任务 t10 由 4/10 提升到 9/10。剩余失分见 4.1/4.3。</p>
 <p>同一工位、同一分类规则，但每类 2 件、任务书换成批量分拣：<b>Agent 侧代码改动 0 行</b>（全部由 <code>R.todo()</code> 驱动），只换任务书与套件。</p>
 <table class="keep">
 <tr><th>任务</th>{"".join(f"<th>{t}</th>" for t, _o, _n, _s in VARIANT['per_task'])}</tr>
@@ -571,38 +629,52 @@ LLM 全链路（模型出计划 + 出代码）抽样 4 任务 × 2 seed = 8/8 �
 <table class="keep">
 <tr><th style="width:26%">套件 / 口径</th><th>episodes</th><th>成功</th><th>失败</th><th class="left">失败构成（按日志统计）</th></tr>
 <tr><td class="left">主任务 libero_bolt_v2（10×10）</td><td>{MAINF['n_total']}</td><td>{MAINF['n_ok']}</td><td>{MAINF['n_total'] - MAINF['n_ok']}</td>
-    <td class="left">无失败</td></tr>
+    <td class="left">{'无失败' if MAINF['n_total'] == MAINF['n_ok'] else f"{MAINF['n_total'] - MAINF['n_ok']} 例：均为 t6 远端边缘抓取后的搬运预算（A17 舒适带 / A24）"}</td></tr>
 <tr><td class="left">变体 libero_bolt_multi（11×10）</td><td>{VARF['n_total']}</td><td>{VARF['n_ok']}</td><td class="warn">{VAR_FAIL_N}</td>
-    <td class="left"><b>{VAR_GRASP_N} 例：抓取失败</b>（`jaws closed on nothing`，全部发生在第 2 件及以后；
-    其中 {VAR_BOTH_N} 例（长程 4 件任务）同时伴随 1 次放置失败）；{VAR_CRASH_N} 例：初始布局不可行（<code>RandomizationError</code>）</td></tr>
+    <td class="left">{VAR_COMPOSITION}</td></tr>
 <tr><td class="left">码垛 libero_wood_stack（11×10）</td><td>{STACKF['n_total']}</td><td>{STACKF['n_ok']}</td><td>{STACKF['n_total'] - STACKF['n_ok']}</td>
     <td class="left">无失败</td></tr>
 <tr><td class="left">视觉闭环（5×4）</td><td>{VISF['n_total']}</td><td>{VISF['n_ok']}</td><td>{VIS_FAIL_N}</td>
     <td class="left">{VIS_GRASP_N} 例抓取失败（感知 xy 偏 5–7 mm）、{VIS_PLACE_N} 例放置失败（盒腔底面被遮挡 → 释放高度偏高 12 mm）</td></tr>
 </table>
-<p><b>最关键的一条统计（也是本作品下一步的靶点）</b>：变体的 {VAR_FAIL_N} 例失败里有 <b>{VAR_SECOND_N} 例（{100 * VAR_SECOND_N / max(VAR_FAIL_N,1):.0f}%）发生在“第 2 件及以后”</b>，
-第 1 件在全部 110 条 episode 里都是成功的。按任务看：{VAR_FAIL_PER_TASK}（分母均为 10）。
-失败原语高度集中：<b>pick 空夹 {VARF['bad_picks']} 次</b>（失败 episode 内的尝试次数，含重抓），
-place 层独立失败 <b>{VAR_PLACE_N} 例</b>（另有 {VAR_BOTH_N} 例是在抓取已经失败之后才出现的放置失败）。
-变体套件中失败的 episode 编号（全量，未剔除）：<span style="font-size:8pt">{VAR_FAIL_EPS}</span>。</p>
+<p><b>本轮的失败结构已经换了一类</b>：变体 {VAR_FAIL_N} 例失败中，<b>{VAR_CRASH_N} 例是初始布局不可行</b>
+（<code>RandomizationError</code>，采样器 20 次都放不下，属于环境可行性而非策略），
+<b>{VAR_FAIL_N - VAR_CRASH_N} 例是搬运预算</b>（远端边缘抓取后跨台面搬运，A24）；
+<b>抓取阶段不再丢分</b>（失败 episode 内的空夹尝试 {VARF['bad_picks']} 次，10-18 那轮是 56 次）。
+按任务看：{VAR_FAIL_PER_TASK}（分母均为 10）。
+逐条失败 episode（全量，未剔除）：<span style="font-size:8pt">{VAR_FAIL_EPS}</span>
+{('；另有 ' + str(VAR_CRASH_N) + ' 例进程级 RandomizationError（无 result.json）') if VAR_CRASH_N else ''}。</p>
 
-<h3>4.2 一条失败 episode 的完整日志回放（libero_bolt_multi / t5 / seed 1000）</h3>
+<h3>4.2 一条失败 episode 的完整日志回放（自动选取：{FAIL_EP}）</h3>
 <pre>{FAIL_TRACE}</pre>
-<p>读法：第 1 件（bolt_small_1）在 561 步内完成抓取 + 入盒，<code>place success=True</code>；随后 <code>home()</code> 回到安全位，
-第 2 件（bolt_small_2）两次 <code>pick</code> 都是 <code>grasped=False</code>，日志写明 <code>jaws closed on nothing</code>，
-两次之后按“最多重抓一次”的提示词约束放弃，{FAIL_CHECK} 步时 <code>check success=False</code> —— 这是<b>抓取失败</b>，不是放置或判定问题。</p>
+<p>读法：抓取只花了 {FAIL_PICK_STEPS} 步（<code>grasped=True</code>），但随后的搬运把剩余的
+<b>{FAIL_TRANSIT_STEPS} 步预算全部烧掉</b>，到 {HORIZON} 步上限时仍未完成释放 → <code>place success=False</code>。
+也就是说，这一版的失败已经从“抓不到”变成了“<b>搬运路线的预算</b>”：抓取阶段几乎不再丢分，
+剩下的坑集中在“远端边缘抓取 → 跨台面搬运”这条路径上（A24）。</p>
 
-<h3>4.3 失败位置指纹：空夹集中在工作空间右侧远端</h3>
-<p>把变体套件<b>失败 episode 内</b>的所有 <code>pick</code> 事件取末端执行器位置：共 <b>{VARF['bad_picks']} 次空夹尝试</b>，
-x 分布 <b>{VAR_X_MIN:+.3f} … {VAR_X_MAX:+.3f} m，中位 {VAR_X_MED:+.3f} m</b>，其中 <b>{VAR_X_RIGHT}/{VARF['bad_picks']}</b> 落在 <b>x &gt; +0.09 m</b>。
-这与码垛阶段独立测到的“舒适带”结论（A17：右侧 x &gt; +0.10 抓取后关节饱和，放置差 145 mm）以及 A9/B2（释放后残留姿态直接去抓下一件）
-互相印证：<b>第 2 件失败不是随机的，而是“残留姿态 + 右侧远端”这条固定路径</b>。下一步因此很明确：
-按件独立编排（每件先回安全位 → 重新规划接近角），而不是一个脚本顺序跑完 —— 这就是 STATUS 里 P1-2 的做法。</p>
+<h3>4.3 失败结构的迁移：从“抓取失败”到“布局不可行 + 搬运预算”</h3>
+<table class="keep">
+<tr><th style="width:26%">口径</th><th>变体套件</th><th class="left">失败构成（每轮都由脚本扫描 trace 统计）</th></tr>
+<tr><td class="left">10-18（P1-2 之前）</td><td>71.8%（79/110）</td>
+    <td class="left">31 例 = <b>28 例抓取失败</b>（全部第 2 件及以后；空夹 56 次、<b>31/56 落在 x &gt; +0.09 m</b>）
+    + 3 例初始布局不可行</td></tr>
+<tr><td class="left">10-25（本轮）</td><td class="good">{VARIANT['overall']}（{VARIANT['ok']}/{VARIANT['n']}）</td>
+    <td class="left">{VAR_FAIL_N} 例 = <b>{VAR_CRASH_N} 例初始布局不可行</b>（<code>RandomizationError</code>，环境可行性，非策略）
+    + {VAR_FAIL_N - VAR_CRASH_N} 例搬运预算（远端边缘抓取后的跨台面搬运，A24）</td></tr>
+</table>
+<p><b>定位链条（A22，完整版见 docs/failures.md）</b>：① 失败样本里第 2 件的下降段停在离台面 24 mm 处、夹爪空夹，
+但抓取点 xy 只差 3–7 mm；② 打印下降各段的接触对，一开始显示“无接触”——因为过滤条件只匹配 <code>robot0_*</code>，
+漏掉了夹爪本体（<code>gripper0_*</code>）；③ 修正过滤后看到 <code>gripper0_finger1 → parts_bin_blue_1</code>，
+即夹爪撞的是<b>料盒</b>；④ 打印料盒位姿，蓝盒已经跑到第 2 件的坐标上（设计位置差 300 mm）；
+⑤ 复现最小路径：<code>grasp(第1件) → transfer(蓝盒)</code> 之后料盒 z 从 0.900 变成 0.9985 并跟着夹爪运动 ——
+低释放（A4 的 <code>cavity_floor+12 mm</code>）让指尖低于盒口伸进内腔，张爪挂住内壁，抬臂就把 130 mm 的料盒一起提走。
+单件任务没有后续动作，所以这个 bug 藏了两周。</p>
 <div class="insight"><b>为什么把这条写进报告</b>：失败分析的价值不在“我们失败了多少”，而在“失败是否可解释、可定位、可修”。
-这条链路上，日志给出了失败原语（pick）、失败件序（第 2 件）、失败位置（x &gt; +0.09）、以及一条独立的可复现对照实验（A17），
-四者互相独立却指向同一根因，因此下一版修复有明确的验收判据。</div>
+这条链路上每一步都是可复查的证据（接触对 → 料盒位姿 → 最小复现脚本 → 修复前后数字），
+而且它解释了一个反直觉现象：<b>日志写着“抓取失败”，真凶却是上一件放置动作</b>。
+修复后变体套件 71.8% → {VARIANT['overall']}，而<b>抓取阶段几乎不再丢分</b>（本轮空夹 {VARF['bad_picks']} 次）。</div>
 
-<h3>4.4 本轮修的真 bug（A6–A13 摘要，完整 32 条索引见 4.5）</h3>
+<h3>4.4 早期修的真 bug（A6–A13 摘要；完整 35 条索引见 4.5，A22–A24 为 10-25 新增）</h3>
 <table class="keep">
 <tr><th style="width:8%">编号</th><th style="width:34%">现象</th><th class="left">根因 → 修法</th></tr>
 <tr><td>A6</td><td>搬运中途停住，误差恒定 0.26 m 直到超步</td>
@@ -624,7 +696,7 @@ x 分布 <b>{VAR_X_MIN:+.3f} … {VAR_X_MAX:+.3f} m，中位 {VAR_X_MED:+.3f} m<
     <td class="left"><code>place()</code> 增加“重抓 + 再搬运”，并用<b>剩余步数 ≥750</b> 守门，避免挤掉多件任务的后半段</td></tr>
 </table>
 
-<h3>4.5 完整失败索引（A1–A21 / B1–B3 / C1–C4 / D1–D4，共 32 条）</h3>
+<h3>4.5 完整失败索引（A1–A24 / B1–B3 / C1–C4 / D1–D4，共 35 条）</h3>
 <p style="font-size:8.6pt;margin:4px 0">A=仿真与判定层，B=控制原语层，C=Agent/LLM 层，D=仍未解决（如实标注）。每条的完整日志与验证命令见 <code>docs/failures.md</code>。</p>
 <table class="idx">
 <thead><tr><th style="width:6%">编号</th><th style="width:38%" class="left">现象</th><th class="left">根因 → 修法 / 现状</th></tr></thead>
@@ -744,7 +816,7 @@ t3 s1000 抓到了但放置失败（蓝盒内腔底面被近侧盒壁遮挡，�
 <li><b>自动修复的泛化问题</b>：r1 对失败根因判断正确（pick 吃掉 717/1200 步 → place 超步），改写在
 <b>配对子集（3 seeds/任务）</b>上 97%→100% 因此被采纳；但全量 100 episodes 复测只有 <b>{REPAIR['overall']}</b>（比修复前 99% 低 1 点）。
 说明“子集提升”不足以证明修复有效 —— 这本身是流水线该暴露的风险，报告里如实列出，主口径采用<b>未修复版</b>的 {MAIN['overall']}。</li>
-<li><b>变体任务的 31 例失败</b>中，28 例是第 2 件抓取（下一版按件编排修），3 例是该 seed 的初始布局不可行（环境可行性，非策略）。</li>
+<li><b>变体任务剩余 {VAR_FAIL_N} 例失败</b>：{VAR_CRASH_N} 例是该 seed 的初始布局不可行（环境可行性，非策略），{VAR_FAIL_N - VAR_CRASH_N} 例是远端边缘抓取后的搬运预算（A24）。<b>抓取失败已从 28 例降到 {VARF['bad_picks']} 次空夹尝试</b>。</li>
 <li><b>真机未做</b>（官方加分 a）：本作品为纯仿真提交；人确认机制按真机口径实现并演示（manual + 急停 + 审计），但未在真实硬件上验证。</li>
 <li><b>无最低指标数值可比</b>：官方《任务说明书》中的最低指标数值未公布，本报告不给“达标/未达标”结论，只给可复现数字。</li>
 <li>全部数字与 <code>runs/*/metrics.json</code> 一一对应，评测协议写死在 <code>docs/protocol.md</code>（第八章摘要）。</li>
