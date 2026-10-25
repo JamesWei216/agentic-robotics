@@ -73,7 +73,8 @@ v1.0-submit    初赛提交版本（含感知闭环 + 交付物）
   运行时不读任何仿真真值；`AGENT_PERCEPTION=vision` 切换。
 - 离线核对（真值仅作测试预言机）：24/24 检出，盒中心 0.4–4.2 mm，螺栓横向 2–7 mm / 沿轴 4–8 mm，
   大小分类 12/12，假目标 0（加尺寸门限前每场景 4 个，来自机械臂本体的大团块）。
-- 在线：**85%（17/20）**；失败集中在"小螺栓→蓝盒"（柄径 13 mm，夹持接触面小）。
+- 在线：**90.0%（18/20）**（区域修复后复测）；两次失败：t3 s1003 抓取两试空夹（xy 偏 5–7 mm 把六角头误当柄）、
+  t3 s1000 放置失败（盒腔底面被盒壁遮挡，深度估计偏高 12 mm）。
 - 三个必须踩的坑：图像缓冲自下而上 vs 内外参自上而下（错配 81 mm → 正确 9 mm）；深度看到的是六角头顶面
   （比柄高 9–14 mm）；腕部像素数≠在手机检（工件在指下方也算）。
 
@@ -86,7 +87,7 @@ v1.0-submit    初赛提交版本（含感知闭环 + 交付物）
 根因判断正确（`pick` 吃掉 717/1200 步 → `place` 超步），子集也确实全过 —— 但全量复测没有提升。
 说明"子集提升"不足以证明修复有效，报告里单列为风险；主口径采用未修复版。
 
-## 6. 人机确认（赛题硬性要求）
+## 6. 人机确认（真机口径；纯仿真 auto 不阻断）
 
 - 三模式 `auto / manual / deny`；四条门控 `first_motion / grasp_close / release / long_travel`。
 - 网页面板 `python -m agent.confirm_server --port 8077`（带**急停**），决定走 `runtime/confirm/`，审计落 `runtime/audit.jsonl`。
@@ -96,13 +97,13 @@ v1.0-submit    初赛提交版本（含感知闭环 + 交付物）
 
 ```
 ~/Desktop/Agentic-Robotics-赛题/
-├── Agentic-Robotics-赛题总结报告.pdf   # 3 页 A4（weasyprint）
+├── Agentic-Robotics-赛题总结报告.pdf   # 15 页 A4（weasyprint，2026-10-25 v2）
 ├── RESULT_SUMMARY.md                    # 本文件
 ├── STATUS.md                            # 交接状态 + 下一步
 ├── requirements.txt
 ├── README.md PLAN.md
 ├── agent/ config/ taskbooks/ scripts/ run.sh
-├── docs/            # workcell / protocol / failures(12 例) / perception
+├── docs/            # workcell / protocol / failures(32 例) / perception / stacking
 ├── reports/videos/  # 9 条演示视频（含 1 条失败）
 ├── runs/            # 主任务 / 变体 / 视觉 / 人确认 的关键运行
 └── confirm_demo_panel/
@@ -136,3 +137,32 @@ $PY scripts/check_feasibility.py libero_bolt_v2 10   # 110/110 布局可行
 - **改动成本**：新增/修改代码 ≈1,224 行（tracked +601/−59 + 新文件 623），其中真正控制逻辑 **292 行**（`expert.py` 208 + `api.py` 84）；新增 1 个对象资产、1 个配置字段（mission 的 `on`）+ 11 条任务协议；编排/执行/评测/安全/人确认/报告层**零改动**。
 - 分拣回归（no-LLM 模板口径）：`libero_bolt_v2` 98.0%（t6 大螺栓 8/10）、`libero_bolt_multi` 72.7%（对照 10-18 LLM 口径 100% / 71.8%）→ 无明显回退。
 - 新增 6 个坑（A16–A21，见 `docs/failures.md`）：抓取高度导致肘关节奇异、工作空间舒适带 x ≤ +0.10、释放间隙要按指尖算、运输高度按垛顶算、限位后不可恢复、mission 解析要区分 init/goal。
+
+---
+
+# 2026-10-25 追加：P1-3 报告定稿（失败案例章 + 评测声明）
+
+**报告 PDF 从 7 页扩到 15 页**（`reports/Agentic-Robotics-赛题总结报告.pdf`，生成器 `scripts/make_report_pdf.py`）。
+
+新增内容：
+1. **第四章 失败案例分析（运行日志实证）**：失败清单/失败原语/失败件序/失败坐标**全部由生成脚本现场扫描**
+   `runs/*/verify/*/result.json` + `trace.jsonl` 统计（`_fail_detail()`），并给出一条失败 episode 的完整日志回放
+   （multi t5 s1000）、失败位置指纹、A6–A13 摘要表、32 条完整失败索引。
+2. **第五章 自动修复 A/B**：机制四步 + 本次 r1 真实结果（子集 97%→100% 采纳、全量 98%）+ `diagnosis_r1.json` 原文摘录 + 诚实结论。
+3. **第八章 评测协议与「无隐藏测试集」声明**：协议表、三条声明（无隐藏测试集 / 无伪造日志 / 数字与运行结果强绑定）、
+   产物清单、干净环境实测（preflight 7/7，CPU-only，~40 min）。
+4. **三·A 工位与物料**：毫米级工位/物料/5 套布局表 + 可达域设计（加分 c 的"可复现工作单元"）。
+5. **附录 A 套件与任务清单**：33 条任务的语言指令（取自 episode_start）。
+6. 口径修正：人确认改为官方口径（仅约束真机；仿真 auto 不阻断）；修正 §二 与实跑数字不一致的旧表述。
+
+### 关键失败统计（本报告新增的硬数字）
+
+| 套件 | episodes | 失败 | 构成 |
+|---|---|---|---|
+| 主任务 bolt_v2 | 100 | 0 | — |
+| 变体 bolt_multi | 110 | 31 | **28 抓取失败（全部第 2 件及以后；其中 3 例伴随 1 次放置失败）** + 3 初始布局不可行 |
+| 码垛 wood_stack | 110 | 0 | — |
+| 视觉闭环 | 20 | 2 | 1 抓取失败 + 1 放置失败 |
+
+失败 pick 的 EE x 分布 −0.133…+0.141 m、中位 +0.102 m，31/56 落在 x > +0.09 → 与码垛阶段独立测到的舒适带（A17）互证，
+下一版按件编排（P1-2）。

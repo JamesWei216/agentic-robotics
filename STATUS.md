@@ -197,3 +197,37 @@ agentic-robotics/
   `echo "<URL> 提取码: xxxx" > config/video_link.txt && bash scripts/make_submission.sh`
 - 方案 B：授权我用 GitHub Release 发（`gh` 未安装，需 token）→ 链接形如
   `https://github.com/<你的GitHub用户名>/agentic-robotics/releases/download/v1.2-stack/AG-VLA-demo-720p.mp4`
+
+---
+
+# 2026-10-25 · P1-3 报告定稿（PDF 7 → 15 页）
+
+**产物**：`reports/Agentic-Robotics-赛题总结报告.pdf`（15 页，生成器 `scripts/make_report_pdf.py`，
+必须用 `/home/wei/miniconda3/envs/smolvla/bin/python` 跑，weasyprint 69.0）。
+
+## 新增/改动
+
+1. **§四 失败案例分析（运行日志实证）**——核心新增：
+   - 4.1 失败总量与构成（主 0/100、变体 31/110、码垛 0/110、视觉 2/20）
+   - 4.2 一条失败 episode 的完整日志回放（multi t5 s1000：第 1 件 ok、第 2 件两次空夹 → 1477 步 check=False）
+   - 4.3 失败位置指纹（失败 pick 的 EE x：−0.133…+0.141，中位 +0.102，31/56 在 x>+0.09 → 与 A17 舒适带互证）
+   - 4.4 A6–A13 摘要表；4.5 **32 条完整失败索引**（A1–A21 / B1–B3 / C1–C4 / D1–D4）
+   - 所有失败数字由 `_fail_detail()` 现场扫描 `runs/*/verify/*/result.json` + `trace.jsonl` 得到，不手写
+2. **§五 自动修复机制与 A/B**：四步机制 + 本次 r1（子集 97%→100% 采纳 / 全量 98%）+ `diagnosis_r1.json` 摘录 + 诚实结论
+3. **§八 评测协议与三条声明**：无隐藏测试集 / 无伪造日志 / 数字与运行结果强绑定；产物清单；干净环境实测（preflight 7/7、CPU-only、~40 min）
+4. **§三·A 工位与物料**（加分 c 的"可复现工作单元"）：毫米级工位/物料/5 套布局 + 可达域设计说明
+5. **附录 A 33 条任务清单**（语言指令取自 episode_start 事件）
+6. **口径修正**：人确认改官方口径（仅约束真机；仿真 auto 不阻断），README / RESULT_SUMMARY 同步；
+   修正 §二 里与实跑不一致的旧句（"唯一失败 t6 一个 seed"）；变体三次复测数字改为 70.0 / 71.8 / 72.7（同一套件定义）
+
+## 报告工程化的两条约定（后续改动必须遵守）
+
+- **数字只能来自 runs/**：`scripts/make_report_pdf.py` 里不允许出现手写成功率；改数字必须重跑实验。
+- **失败统计自动化**：`_fail_detail()` 的分类口径写死（crash=无 result.json；grasp=pick 空夹；place=place 失败）。
+
+## 还剩什么（P1-3 之外）
+
+1. **视频链接**（唯一硬阻塞）：等 James 上传 → `echo "<URL> 提取码: xxxx" > config/video_link.txt && bash scripts/make_submission.sh`
+2. **P1-2 变体 71.8% → ≥85%**：按件独立编排（每件先回安全位 → 重新规划接近角），靶点已由 §4.3 定位
+3. **PPT 12 页**需要同步新数字 + 失败分析一页（原 PPT 是 10-18 版）
+4. 可选：GitHub Release 挂 v1.2-stack 资产

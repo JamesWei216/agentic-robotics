@@ -53,9 +53,10 @@ taskbooks/sort_main.md           ← 自然语言任务书（工位/物料/目�
 | `pick_and_place(object, box)` | 上面两步的合成 |
 | `home()` / `check()` / `log()` / `confirm(action)` | 回安全位 / 判定成功 / 打点 / 人确认 |
 
-### 人机确认（赛题硬性要求）
+### 人机确认（真机口径；纯仿真默认 auto 不阻断）
 
-- 三模式：`auto`（纯仿真，仍写审计）/ `manual`（真机式阻塞）/ `deny`（回归测试用）。
+- 三模式：`auto`（纯仿真：不阻断，但仍计算门控并写审计）/ `manual`（真机式阻塞）/ `deny`（回归测试用）。
+- 官方口径：赛题要求的是**真机**运动前的人确认，纯仿真评测不要求逐动作确认——机制常设，模式可切。
 - 四条门控：`first_motion`（解除使能）、`grasp_close`（夹爪闭合）、`release`（释放物料）、`long_travel`（长距离移动）。
 - 网页面板 `python -m agent.confirm_server --port 8077`，带**急停**按钮（写 `runtime/ESTOP`，所有原语每步检查）；
   决定走 `runtime/confirm/*.json`，审计落 `runtime/audit.jsonl`。
