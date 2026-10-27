@@ -141,7 +141,8 @@ EOF
 echo "   -> 00_提交说明.md"
 
 echo "== 8. 脱敏自检 =="
-PAT='<已隐去>|<已隐去>|<已隐去>|<你的GitHub用户名>'
+# 敏感词表分段拼接：避免本脚本源码自身被扫描命中
+PAT="$(grep -v '^#' config/sensitive.txt | paste -sd'|' -)"  # wordlist in config/sensitive.txt
 bad=0
 scan() { # $1=label  $2...=paths
   local label="$1"; shift
