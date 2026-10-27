@@ -62,7 +62,7 @@ Agent 全链路 = 任务书 → LLM 计划（步骤/约束/风险/确认点）�
 
 | 项 | 状态 |
 |---|---|
-| 代码仓库 | ✅ <https://github.com/<你的GitHub用户名>/agentic-robotics>（public，16 提交 / 8 tag / 79 文件，SSH 推送） |
+| 代码仓库 | ✅ 已建（地址见本仓 `git remote -v`；**材料中不写仓库/账号链接**，代码随提交包 02_代码/ 提供） |
 | 认证 | ✅ SSH（`~/.ssh/id_ed25519`，无口令，公钥已加到 GitHub）；一次性 token 已删除 |
 | 提交包 | ✅ `~/Desktop/Agentic-Robotics-提交包-20261018/`（11 MB：repo bundle / 两个 zip / 演示片 + 10 片段 / 12 页 PPT / 5 页 PDF） |
 | PR 合入方式 | 后续修改直接 `git push origin master`（SSH 免 token）；大改动建议开分支 + tag |
@@ -183,20 +183,20 @@ agentic-robotics/
 
 # 2026-10-23 · P0-2 / P0-3 进展
 
-**参赛信息（已落 `config/submission_meta.txt`，不入库）**：<已按赛题要求隐去> / AG-VLA智能机械臂 / 魏凤辰 / <已隐去>
+**参赛信息（脱敏口径：材料中只出现姓名）**：姓名=魏凤辰 / 作品名=AG-VLA智能机械臂；单位与手机号只存 `config/submission_meta.txt`（不入库、不进包、不出现在 PDF/PPT/视频）
 
 ## 已完成
 - `scripts/make_submission.sh` 改造：读 meta → 注入 `VIDEO_URL` 重生成 PDF → 只打包三件套（PDF + 02_代码 + 03_视频链接.txt）
 - `scripts/make_demo_video_720p.py`：**成片 4 分 39 秒 / 1280×720 / 25 fps / 18MB**（卡片 + 回合录像 + 指标面板 + 动态加速倍率）
 - 报告 PDF 扩到 **7 页**：新增「一·B Agent 证据链」（plan/code/trace/AST 拦截真实片段）、「三·B 码垛（加分 c）」含改动成本表、视频链接行、参赛抬头，KPI 四格（100% / 71.8% / 100% / 90%）
-- 提交包已生成：`~/Desktop/提交包-20261023/<已按赛题要求隐去>-AG-VLA智能机械臂-魏凤辰-<已隐去>-20261023.zip`（5.8MB）
+- 提交包已生成：`~/Desktop/提交包-20261027/AG-VLA智能机械臂-魏凤辰-20261027.zip`（命名不带单位/手机号）
 
 ## 唯一未完成：视频链接
 官方要求 PDF 内含 ≤5min / ≥720P 视频链接。成片已就绪，缺**上传渠道**：
 - 方案 A（推荐）：James 上传百度网盘/B 站 → 把链接（+提取码）给我 → 我执行
   `echo "<URL> 提取码: xxxx" > config/video_link.txt && bash scripts/make_submission.sh`
 - 方案 B：授权我用 GitHub Release 发（`gh` 未安装，需 token）→ 链接形如
-  `https://github.com/<你的GitHub用户名>/agentic-robotics/releases/download/v1.2-stack/AG-VLA-demo-720p.mp4`
+  `reports/videos/AG-VLA-demo-720p.mp4`（视频随提交包提供，不挂外链）
 
 ---
 

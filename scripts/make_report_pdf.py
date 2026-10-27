@@ -46,11 +46,13 @@ VIS_M = _latest(os.environ.get("VIS_RUN", "20261025-220618_vision_final"))
 STACK_M = _latest(os.environ.get("STACK_RUN", "20261025-220702_stack_final"))
 REPAIR_M = _latest(os.environ.get("REPAIR_RUN", "20261018-104215_v2_final2"))
 
-# 参赛信息 + 视频链接（提交包构建时由 make_submission.sh 通过环境变量注入）
-ORG = os.environ.get("SUB_ORG", "<已按赛题要求隐去>")
+# 参赛信息 + 视频（提交包构建时由 make_submission.sh 通过环境变量注入）
+# 官方脱敏要求：材料中只可出现姓名 —— 单位 / 电话 / 邮箱 / 个人账号一律不渲染
 WORK = os.environ.get("SUB_WORK", "AG-VLA智能机械臂")
 LEADER = os.environ.get("SUB_LEADER", "魏凤辰")
 VIDEO_URL = os.environ.get("VIDEO_URL", "").strip()
+VIDEO_FILE_NOTE = os.environ.get("VIDEO_FILE_NOTE", "03_演示视频.mp4")
+VIDEO_SPEC = os.environ.get("VIDEO_SPEC", "4 分 41 秒 / 1280×720 / 25 fps / H.264 · 17.4 MB")
 
 MAIN = dict(overall=_pct(MAIN_M), ok=MAIN_M["ok"], n=MAIN_M["n"],
             steps=MAIN_M.get("mean_steps", 0), run=MAIN_M["_run"],
@@ -455,7 +457,7 @@ HTML = f"""<!DOCTYPE html>
 </style></head><body>
 
 <h1>Agentic Robotics 赛题 · 总结报告</h1>
-<div class="sub">作品：<b>{WORK}</b> · 单位：{ORG} · 队长：{LEADER}<br>
+<div class="sub">作品：<b>{WORK}</b> · 参赛者：{LEADER}<br>
 赛题：Agent 驱动的机械臂应用开发与评测流水线 · 主任务=分拣，变体=批量分拣，加分 b=视觉闭环，加分 c=码垛<br>
 平台：LIBERO / MuJoCo · Franka Panda 单臂 + 平行二指夹爪 · 纯仿真 · 报告版本 v3（2026-10-25 深夜：变体套件修复后全量复测，71.8% → 95.5%；新增失败案例章与评测声明）</div>
 
@@ -800,13 +802,13 @@ t3 s1000 抓到了但放置失败（蓝盒内腔底面被近侧盒壁遮挡，�
 详细记录见 <code>docs/repro_check_20261022.md</code>。纯 CPU 机器同样可跑（本次验证就没有用训练卡）。</p>
 
 <h2>九、演示视频（≤ 5 分钟，1280×720）</h2>
-<p><b>视频链接：</b>{('<a href="' + VIDEO_URL + '">' + VIDEO_URL + '</a>') if VIDEO_URL else '见随包 <code>03_视频链接.txt</code>（网盘链接与提取码）'}</p>
-<p>成片 <code>reports/videos/AG-VLA-demo-720p.mp4</code>（4 分 39 秒，1280×720，25 fps）按“概述 → 主任务 → 变体 → 码垛 →
+<p><b>演示视频：</b>{('<a href="' + VIDEO_URL + '">' + VIDEO_URL + '</a>') if VIDEO_URL else '随包提供 <code>' + VIDEO_FILE_NOTE + '</code>'}（{VIDEO_SPEC}，满足 ≤ 5 分钟、≥ 720P）</p>
+<p>成片 <code>{VIDEO_FILE_NOTE}</code>（{VIDEO_SPEC}）按“概述 → 主任务 → 变体 → 码垛 →
 视觉闭环 → 人确认 → 失败案例 → 复现”编排；每个片段都标注了实际加速倍率，画面右下角的时间轴可核对进度。
 原始素材是仿真回合录像（每条 episode 独立子进程 + 逐原语 trace）：</p>
 <ul>
 <li><b>成功</b>：v2 t0 / t1 / t5 / t6（含曾经的唯一失败 seed s1006）/ t9 / t10 双件、multi t3 三件、码垛 t0 三层塔与 t10 双层双列、以及<b>视觉闭环</b>一条。</li>
-<li><b>失败（如实保留）</b>：<code>libero_bolt_multi_t10_s1000_fail.mp4</code> —— 长程 4 件，预算耗尽。</li>
+<li><b>失败（如实保留）</b>：<code>libero_bolt_multi_t9_s1000_budget_fail.mp4</code> —— 第 1 件成功，第 2 件搬运超预算（远端边缘 x≈+0.17）。</li>
 </ul>
 
 <h2>十、诚实边界（必须与数字一起看）</h2>

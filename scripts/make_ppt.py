@@ -195,7 +195,7 @@ def build():
           ("平台：LIBERO / MuJoCo · Franka Panda + 平行二指夹爪 · 纯仿真", 15,
            RGBColor(0xC9, 0xD1, 0xD9), False)])
     text(s, Inches(0.9), Inches(6.3), Inches(11.5), Inches(0.5),
-         [("2026-10-25", 13, RGBColor(0x8A, 0x8F, 0x98), False)])
+         [("参赛者：魏凤辰 · 2026-10-27", 13, RGBColor(0x8A, 0x8F, 0x98), False)])
 
     # 2 一页看懂
     s = blank(prs)
@@ -344,20 +344,19 @@ def build():
 
     # 12 交付与下一步
     s = blank(prs)
-    header(s, "交付物与下一步", "提交包：桌面 / 提交包-20261023（PDF + 代码 + 视频）")
+    header(s, "交付物与下一步", "提交包：桌面 / 提交包-20261027（PDF + 代码 + 演示视频 + PPT，同一文件夹）")
     table(s, Inches(0.55), Inches(1.55), Inches(6.4), [
         ["内容", "说明"],
         ["01_技术文档.pdf", "15 页总结报告（本 PPT 同源）"],
         ["02_代码/", "git archive HEAD + 关键 runs（metrics/trace/plan）"],
-        ["03_视频链接.txt", "网盘链接与提取码（待填）"],
-        ["演示成片", "AG-VLA-demo-720p.mp4，4′39″ / 1280×720"],
-        ["仓库", "github.com/<你的GitHub用户名>/agentic-robotics（public）"],
+        ["03_演示视频.mp4", "随包提供，4′41″ / 1280×720 / 25 fps"],
+        ["04_汇报PPT.pptx", "本 PPT（12 页）"],
     ], col_w=[1.5, 4.9], size=11.5)
     bullets(s, Inches(7.2), Inches(1.6), Inches(5.6), Inches(4.8), [
         ("已完成：", "P1-2 变体套件 71.8% → 95.5%（A22 料盒被拖走；释放高度按内腔宽度分档）"),
         ("已完成：", "P1-3 报告定稿（15 页：失败案例章 / 自动修复 A/B / 评测协议声明 / 工位物料 / 33 条任务清单）"),
-        ("剩余 1：", "视频链接（唯一硬阻塞）→ 写入 config/video_link.txt 后重跑 make_submission.sh"),
-        ("剩余 2：", "演示视频里的数字卡片仍待同步（本轮 PPT 已同步）"),
+        ("已完成：", "交付物统一数字（PDF / PPT / 视频均从 metrics.json 读取）"),
+        ("约束：", "材料只出现姓名，单位 / 联系方式一律不出现"),
         ("提交前需确认：", "官方《任务说明书》与最低指标数值"),
     ], size=12.5)
 

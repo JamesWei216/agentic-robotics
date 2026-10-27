@@ -81,7 +81,7 @@ def base_canvas():
 def footer(d, label, pct):
     d.rectangle([0, H - 6, W, H], fill=(30, 36, 48))
     d.rectangle([0, H - 6, int(W * pct), H], fill=ACCENT)
-    d.text((28, H - 40), "AG-VLA 智能机械臂 · <已按赛题要求隐去>", font=F["small"], fill=DIM)
+    d.text((28, H - 40), "AG-VLA 智能机械臂 · 魏凤辰", font=F["small"], fill=DIM)
     tw = d.textlength(label, font=F["small"])
     d.text((W - 28 - tw, H - 40), label, font=F["small"], fill=DIM)
 
@@ -300,14 +300,14 @@ def main():
                 "bash scripts/bootstrap_env.sh  → 装依赖、装资产、生成四套任务与固定初始状态",
                 "python scripts/preflight.py  → 7 项自检全绿（含码垛资产与套件注册）",
                 "./run.sh --suite <套件> --taskbook <任务书> --seeds 10  → 复跑本视频里的数字",
-                ("代码与运行日志：github.com/<你的GitHub用户名>/agentic-robotics", ACCENT2),
+                ("代码与运行日志：随包 02_代码/（metrics / trace / plan）", ACCENT2),
             ], pct_label(), note="干净环境（新建 conda + requirements 从零装）已验证 preflight 全绿") for _ in range(n)]
         elif kind == "outro":
             frames = [card_title(
                 [("谢谢", "title", FG),
-                 ("AG-VLA 智能机械臂 · <已按赛题要求隐去>", "body", ACCENT),
-                 ("队长：魏凤辰", "body", DIM)],
-                "2026-10-25", pct_label()) for _ in range(n)]
+                 ("AG-VLA 智能机械臂", "body", ACCENT),
+                 ("参赛者：魏凤辰", "body", DIM)],
+                "2026-10-27", pct_label()) for _ in range(n)]
         else:  # clip scenes
             clip_name = scene[2]
             tag = scene[3]
