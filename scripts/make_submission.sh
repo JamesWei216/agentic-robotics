@@ -141,23 +141,31 @@ EOF
 echo "   -> 00_提交说明.md"
 
 echo "== 8. 脱敏自检 =="
-# 敏感词表分段拼接：避免本脚本源码自身被扫描命中
-PAT="$(grep -v '^#' config/sensitive.txt | paste -sd'|' -)"  # wordlist in config/sensitive.txt
-bad=0
-scan() { # $1=label  $2...=paths
-  local label="$1"; shift
-  if grep -rIl -E "$PAT" "$@" >/dev/null 2>&1; then
-    echo "   ✗ $label 命中敏感词：" >&2; grep -rIl -E "$PAT" "$@" >&2; bad=1
+# 敏感词表放在 config/sensitive.txt（不入库、不进包）—— 脚本自身不含任何身份片段
+PAT=""
+SENS_FILE="$ROOT/config/sensitive.txt"
+if [ -f "$SENS_FILE" ]; then
+  PAT="$(grep -v '^[[:space:]]*$' "$SENS_FILE" | paste -sd'|' -)"
+fi
+if [ -z "$PAT" ]; then
+  echo "   (跳过：$SENS_FILE 不存在，无词表可比对)"
+else
+  bad=0
+  scan() { # $1=label  $2...=paths
+    local label="$1"; shift
+    if grep -rIl -E "$PAT" "$@" >/dev/null 2>&1; then
+      echo "   ✗ $label 命中敏感词：" >&2; grep -rIl -E "$PAT" "$@" >&2; bad=1
+    fi
+  }
+  scan "代码与文档" "$OUT/02_代码" "$OUT/00_提交说明.md"
+  if command -v pdftotext >/dev/null 2>&1; then
+    pdftotext "$OUT/01_技术文档.pdf" - 2>/dev/null | grep -Eq "$PAT" && { echo "   ✗ PDF 命中敏感词" >&2; bad=1; }
   fi
-}
-scan "代码与文档" "$OUT/02_代码" "$OUT/00_提交说明.md"
-if command -v pdftotext >/dev/null 2>&1; then
-  pdftotext "$OUT/01_技术文档.pdf" - 2>/dev/null | grep -Eq "$PAT" && { echo "   ✗ PDF 命中敏感词" >&2; bad=1; }
+  if unzip -p "$OUT/04_汇报PPT.pptx" 'ppt/slides/slide*.xml' 2>/dev/null | grep -aqE "$PAT"; then
+    echo "   ✗ PPT 命中敏感词" >&2; bad=1
+  fi
+  [ "$bad" -eq 0 ] && echo "   ✓ 未发现单位 / 手机号 / 账号字样（视频为像素渲染，已由生成脚本源头脱敏）"
 fi
-if unzip -p "$OUT/04_汇报PPT.pptx" 'ppt/slides/slide*.xml' 2>/dev/null | grep -aqE "$PAT"; then
-  echo "   ✗ PPT 命中敏感词" >&2; bad=1
-fi
-[ "$bad" -eq 0 ] && echo "   ✓ 未发现单位 / 手机号 / 账号字样（视频为像素渲染，已由生成脚本源头脱敏）"
 
 echo "== 9. 打包（含视频） =="
 ( cd "$OUT" && zip -qr "$NAME.zip" 00_提交说明.md 01_技术文档.pdf 02_代码 03_演示视频.mp4 04_汇报PPT.pptx )

@@ -23,3 +23,6 @@ runtime/
 # 提交包元信息（含队长手机号，不入库）
 config/submission_meta.txt
 config/video_link.txt
+
+# 脱敏自检词表（含真实单位名/手机号，不入库）
+config/sensitive.txt
